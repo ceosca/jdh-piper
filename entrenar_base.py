@@ -47,6 +47,9 @@ def main() -> None:
     ckpts = ROOT / "training" / nombre / "ckpts"
     ckpts.mkdir(parents=True, exist_ok=True)
 
+    from preparar_base import asegurar_base
+    asegurar_base(args.base_mono)  # regenera el base saneado del crudo si falta
+
     if args.resume:
         ckr = torch.load(args.resume, map_location="cpu")
         validos = set(inspect.signature(VitsModel.__init__).parameters) - {"self", "kwargs"}

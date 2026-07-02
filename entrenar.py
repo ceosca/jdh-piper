@@ -43,6 +43,8 @@ def main() -> None:
     wavs = ds / "wavs"
     if not csv.exists() or not wavs.exists():
         sys.exit(f"Falta {csv} o {wavs}. Armá el dataset primero.")
+    from preparar_base import asegurar_base
+    asegurar_base(args.base)  # regenera el base saneado del crudo si falta
     if not Path(args.base).exists():
         sys.exit(f"No existe el checkpoint base: {args.base}")
 
