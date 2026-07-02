@@ -101,3 +101,97 @@ def list_runs(root: Path) -> list[RunState]:
             st.estado = "terminado"
         out.append(st)
     return out
+
+
+import datetime as _dt
+import subprocess
+
+
+def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
+    rp = Path(root_proj)
+    ds = st.dataset
+    ckpt = st.resume_ckpt or st.base_ckpt
+    if st.auto_stop:
+        # entrenar.py trae EarlyStopping(val_mel) + checkpoints + best
+        argv = [py, str(rp / "entrenar.py"),
+                "--voz", st.nombre,
+                "--base", ckpt,
+                "--max-epochs", str(st.max_epochs),
+                "--paciencia", str(st.paciencia),
+                "--cada", str(st.cada)]
+    else:
+        # épocas manuales, sin early-stop: train_run.py fit
+        ck = rp / "training" / st.nombre / "ckpts"
+        cb = ('{"class_path":"lightning.pytorch.callbacks.ModelCheckpoint",'
+              '"init_args":{"dirpath":"%s","every_n_epochs":100,'
+              '"save_top_k":-1,"save_last":true,"filename":"%s-{epoch}"}}'
+              % (ck.as_posix(), st.nombre))
+        argv = [py, str(rp / "train_run.py"), "fit",
+                "--data.voice_name", st.nombre,
+                "--data.csv_path", f"{ds}/metadata.csv",
+                "--data.audio_dir", f"{ds}/wavs",
+                "--model.sample_rate", "22050",
+                "--data.espeak_voice", "es",
+                "--data.cache_dir", f"{ds}/cache",
+                "--data.config_path", f"{ds}/config.json",
+                "--data.batch_size", "8", "--data.num_workers", "0",
+                "--ckpt_path", ckpt,
+                "--trainer.max_epochs", str(st.max_epochs),
+                "--trainer.accelerator", "gpu", "--trainer.devices", "1",
+                "--trainer.default_root_dir", str(rp / "training" / st.nombre),
+                "--trainer.callbacks+", cb]
+    return argv
+
+
+def _spawn_detached(argv: list[str], cwd: Path, log_path: Path) -> int:
+    log = open(log_path, "a", encoding="utf-8", buffering=1)
+    kwargs = dict(cwd=str(cwd), stdout=log, stderr=log, stdin=subprocess.DEVNULL)
+    if sys.platform == "win32":
+        DETACHED_PROCESS = 0x00000008
+        CREATE_NEW_PROCESS_GROUP = 0x00000200
+        kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    p = subprocess.Popen(argv, **kwargs)
+    return p.pid
+
+
+def launch(root_runs: Path, root_proj: Path, st: RunState, py: str) -> RunState:
+    rd = run_dir(root_runs, st.nombre)
+    (rd / "ckpts").mkdir(parents=True, exist_ok=True)
+    argv = build_train_argv(py, root_proj, st)
+    st.pid = _spawn_detached(argv, Path(root_proj), rd / "train.log")
+    st.started_at = _dt.datetime.now().isoformat(timespec="seconds")
+    st.estado = "entrenando"
+    st.last_event = "lanzado"
+    save_run(root_runs, st)
+    return st
+
+
+def _kill(pid: int | None) -> None:
+    if not pid or not pid_alive(pid):
+        return
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                       capture_output=True)
+    else:
+        import os, signal
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+
+
+def pause(root_runs: Path, st: RunState) -> RunState:
+    _kill(st.pid)
+    st.pid = None
+    st.estado = "pausado"
+    st.last_event = "pausado"
+    save_run(root_runs, st)
+    return st
+
+
+def resume(root_runs: Path, root_proj: Path, st: RunState, py: str) -> RunState:
+    last = run_dir(root_runs, st.nombre) / "ckpts" / "last.ckpt"
+    st.resume_ckpt = st.resume_ckpt or (str(last) if last.exists() else st.base_ckpt)
+    return launch(root_runs, root_proj, st, py)

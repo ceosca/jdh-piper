@@ -53,5 +53,37 @@ class TestRuns(unittest.TestCase):
         self.assertNotEqual(runs[0].estado, "entrenando")
 
 
+from studio.runs import build_train_argv
+
+class TestArgv(unittest.TestCase):
+    def _mk(self, **kw):
+        from studio.runs import RunState
+        base = dict(nombre="silvio", modo="finetune", dataset="datasets/silvio",
+                    base_ckpt="base.ckpt", max_epochs=1500, auto_stop=True,
+                    paciencia=20, cada=10)
+        base.update(kw); return RunState(**base)
+
+    def test_autostop_usa_entrenar(self):
+        argv = build_train_argv("py.exe", Path("."), self._mk(auto_stop=True))
+        self.assertIn("entrenar.py", " ".join(argv))
+        self.assertIn("--paciencia", argv)
+        self.assertIn("20", argv)
+
+    def test_manual_usa_train_run_sin_earlystop(self):
+        argv = build_train_argv("py.exe", Path("."), self._mk(auto_stop=False, max_epochs=2000))
+        joined = " ".join(argv)
+        self.assertIn("train_run.py", joined)
+        self.assertIn("fit", argv)
+        self.assertIn("--trainer.max_epochs", argv)
+        self.assertIn("2000", argv)
+        self.assertNotIn("EarlyStopping", joined)
+
+    def test_resume_pasa_ckpt(self):
+        st = self._mk(auto_stop=False, resume_ckpt="training/silvio/ckpts/last.ckpt")
+        argv = build_train_argv("py.exe", Path("."), st)
+        self.assertIn("--ckpt_path", argv)
+        self.assertIn("training/silvio/ckpts/last.ckpt", argv)
+
+
 if __name__ == "__main__":
     unittest.main()
