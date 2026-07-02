@@ -44,6 +44,21 @@ class TrainPanel(wx.Panel):
         row.Add(self.ds_btn, 0, wx.ALL, 4)
         s.Add(row, 0, wx.EXPAND)
 
+        row_modo = wx.BoxSizer(wx.HORIZONTAL)
+        modo_lbl = wx.StaticText(self, label="Modo:")
+        self.modo = wx.Choice(self, choices=["Fine-tune de una voz", "Base multi-hablante"],
+                              name="Modo de entrenamiento")
+        self.modo.SetSelection(0)
+        spk_lbl = wx.StaticText(self, label="Nº de hablantes:")
+        self.num_spk = wx.SpinCtrl(self, min=1, max=1000, initial=10, name="Número de hablantes")
+        self.num_spk.Enable(False)
+        row_modo.Add(modo_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row_modo.Add(self.modo, 0, wx.ALL, 4)
+        row_modo.Add(spk_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row_modo.Add(self.num_spk, 0, wx.ALL, 4)
+        s.Add(row_modo, 0, wx.EXPAND)
+        self.modo.Bind(wx.EVT_CHOICE, self._toggle_modo)
+
         row2 = wx.BoxSizer(wx.HORIZONTAL)
         lbl_ep = wx.StaticText(self, label="Épocas:")
         self.epochs = wx.SpinCtrl(self, min=1, max=100000, initial=800, name="Épocas")
@@ -95,6 +110,10 @@ class TrainPanel(wx.Panel):
         on = self.auto.GetValue()
         self.paciencia.Enable(on); self.cada.Enable(on)
 
+    def _toggle_modo(self, e):
+        es_base = self.modo.GetSelection() == 1
+        self.num_spk.Enable(es_base)
+
     def set_status(self, t):
         self.status.SetLabel(str(t)); self.nvda.speak(str(t), True)
 
@@ -105,9 +124,11 @@ class TrainPanel(wx.Panel):
                 self.set_status(f"Dataset: {Path(self.dataset).name}")
 
     def _current_state(self) -> runs.RunState:
+        es_base = self.modo.GetSelection() == 1
         return runs.RunState(
             nombre=self.name_ctrl.GetValue().strip() or "mivoz",
-            modo="finetune",
+            modo="base" if es_base else "finetune",
+            num_speakers=self.num_spk.GetValue(),
             dataset=self.dataset or str(ROOT / "datasets" / (self.name_ctrl.GetValue().strip() or "mivoz")),
             base_ckpt=str(DEFAULT_BASE),
             max_epochs=self.epochs.GetValue(),
