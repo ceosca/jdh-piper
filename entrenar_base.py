@@ -7,6 +7,7 @@ Uso:
   env\\python.exe entrenar_base.py --dataset datasets/base_latino --base-mono base_ckpt/silvio_base_clean.ckpt --num-speakers 12
 """
 import argparse
+import inspect
 import pathlib
 from pathlib import Path
 
@@ -36,22 +37,32 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=12)
     ap.add_argument("--espeak", default="es-419")
     ap.add_argument("--sample-rate", type=int, default=22050)
+    ap.add_argument("--voz", default=None, help="Nombre de la corrida (clave del dir de checkpoints en la GUI)")
+    ap.add_argument("--resume", default=None, help="Checkpoint del que reanudar (salta la cirugía)")
     args = ap.parse_args()
 
     ds = Path(args.dataset)
-    nombre = ds.name
+    nombre = args.voz or ds.name
     ckpts = ROOT / "training" / nombre / "ckpts"
     ckpts.mkdir(parents=True, exist_ok=True)
 
-    # hparams multi a partir del mono
-    ck = torch.load(args.base_mono, map_location="cpu")
-    hp = hparams_multi(ck["hyper_parameters"], args.num_speakers, args.gin_channels)
-    hp["batch_size"] = args.batch_size
-
-    model = VitsModel(**hp)
-    merged, n_cop, n_new = fusionar_pesos(ck["state_dict"], model.state_dict())
-    model.load_state_dict(merged)
-    print(f"[cirugía] copiadas={n_cop} nuevas(random)={n_new}")
+    if args.resume:
+        ckr = torch.load(args.resume, map_location="cpu")
+        validos = set(inspect.signature(VitsModel.__init__).parameters) - {"self", "kwargs"}
+        hp = {k: v for k, v in ckr["hyper_parameters"].items() if k in validos}
+        hp["batch_size"] = args.batch_size
+        model = VitsModel(**hp)
+        resume_ckpt = args.resume
+    else:
+        # hparams multi a partir del mono
+        ck = torch.load(args.base_mono, map_location="cpu")
+        hp = hparams_multi(ck["hyper_parameters"], args.num_speakers, args.gin_channels)
+        hp["batch_size"] = args.batch_size
+        model = VitsModel(**hp)
+        merged, n_cop, n_new = fusionar_pesos(ck["state_dict"], model.state_dict())
+        model.load_state_dict(merged)
+        print(f"[cirugía] copiadas={n_cop} nuevas(random)={n_new}")
+        resume_ckpt = None
 
     data = VitsDataModule(
         csv_path=str(ds / "metadata.csv"),
@@ -73,7 +84,7 @@ def main() -> None:
                                    save_top_k=-1, save_last=True,
                                    filename=nombre + "-{epoch}")],
     )
-    trainer.fit(model, data)
+    trainer.fit(model, data, ckpt_path=resume_ckpt)
 
 
 if __name__ == "__main__":

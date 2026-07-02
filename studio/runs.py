@@ -112,11 +112,15 @@ def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
     rp = Path(root_proj)
     ds = st.dataset
     if st.modo == "base":
-        return [py, str(Path(root_proj) / "entrenar_base.py"),
+        argv = [py, str(rp / "entrenar_base.py"),
                 "--dataset", st.dataset,
                 "--base-mono", st.base_ckpt,
+                "--voz", st.nombre,
                 "--num-speakers", str(st.num_speakers),
                 "--max-epochs", str(st.max_epochs)]
+        if st.resume_ckpt:
+            argv += ["--resume", str(st.resume_ckpt)]
+        return argv
     ckpt = st.resume_ckpt or st.base_ckpt
     if st.auto_stop:
         # entrenar.py trae EarlyStopping(val_mel) + checkpoints + best

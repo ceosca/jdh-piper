@@ -125,6 +125,19 @@ class TestArgvBase(unittest.TestCase):
         self.assertIn("--num-speakers", argv)
         self.assertIn("12", argv)
         self.assertIn("--base-mono", argv)
+        self.assertIn("--voz", argv)
+        self.assertIn(st.nombre, argv)
+
+    def test_modo_base_con_resume_pasa_resume_ckpt(self):
+        from studio.runs import RunState, build_train_argv
+        from pathlib import Path
+        resume_path = "training/base_latino/ckpts/last.ckpt"
+        st = RunState(nombre="base_latino", modo="base", dataset="datasets/base_latino",
+                      base_ckpt="base_ckpt/silvio_base_clean.ckpt", max_epochs=4000,
+                      num_speakers=12, resume_ckpt=resume_path)
+        argv = build_train_argv("py.exe", Path("."), st)
+        self.assertIn("--resume", argv)
+        self.assertIn(resume_path, argv)
 
 
 if __name__ == "__main__":
