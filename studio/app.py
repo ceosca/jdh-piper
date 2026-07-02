@@ -14,6 +14,7 @@ import wx  # noqa: E402
 from studio.nvda import NVDAController  # noqa: E402
 from studio.section_train import TrainPanel  # noqa: E402
 from studio.section_compare import ComparePanel  # noqa: E402
+from studio.section_export import ExportPanel  # noqa: E402
 
 
 class StudioFrame(wx.Frame):
@@ -24,7 +25,7 @@ class StudioFrame(wx.Frame):
         # Las secciones reales se agregan en tareas siguientes:
         self.nb.AddPage(TrainPanel(self.nb, self.nvda), "Entrenar")
         self.nb.AddPage(ComparePanel(self.nb, self.nvda), "Comparar")
-        self._add_placeholder("Exportar")
+        self.nb.AddPage(ExportPanel(self.nb, self.nvda), "Exportar")
         self.Centre(); self.Show()
         self.nvda.speak("Piper Studio abierto", True)
 
