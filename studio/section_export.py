@@ -17,10 +17,13 @@ class ExportPanel(wx.Panel):
         s = wx.BoxSizer(wx.VERTICAL)
         self.status = wx.StaticText(self, label="Exportá un checkpoint a ONNX e instalalo.")
         s.Add(self.status, 0, wx.ALL, 6)
+        # NVDA usa como etiqueta el StaticText creado JUSTO ANTES del control
+        # (orden de creación). La etiqueta se instancia antes que su campo.
         row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl_voz = wx.StaticText(self, label="Voz:")
         self.voz = wx.TextCtrl(self, value="silvio", name="Voz")
         self.ckpt_btn = wx.Button(self, label="Elegir &checkpoint…")
-        row.Add(wx.StaticText(self, label="Voz:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row.Add(lbl_voz, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
         row.Add(self.voz, 1, wx.ALL, 4); row.Add(self.ckpt_btn, 0, wx.ALL, 4)
         s.Add(row, 0, wx.EXPAND)
         self.ckpt = ""

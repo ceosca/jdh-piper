@@ -16,11 +16,16 @@ class ComparePanel(wx.Panel):
         s = wx.BoxSizer(wx.VERTICAL)
         self.status = wx.StaticText(self, label="Elegí una voz y generá los WAVs para comparar.")
         s.Add(self.status, 0, wx.ALL, 6)
+        # NVDA usa como etiqueta el StaticText creado JUSTO ANTES del control
+        # (orden de creación). Cada etiqueta se instancia antes que su campo.
         row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl_voz = wx.StaticText(self, label="Voz:")
         self.voz = wx.TextCtrl(self, value="silvio", name="Voz")
-        row.Add(wx.StaticText(self, label="Voz:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row.Add(lbl_voz, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
         row.Add(self.voz, 1, wx.ALL, 4)
         s.Add(row, 0, wx.EXPAND)
+        lbl_frase = wx.StaticText(self, label="Frase:")
+        s.Add(lbl_frase, 0, wx.LEFT | wx.TOP, 6)
         self.text = wx.TextCtrl(self, value="Hola, esta es una prueba de la voz.",
                                 style=wx.TE_MULTILINE, size=(-1, 60), name="Frase")
         s.Add(self.text, 0, wx.ALL | wx.EXPAND, 6)
