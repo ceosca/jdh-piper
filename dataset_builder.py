@@ -183,3 +183,39 @@ def build_dataset(inputs, out_dir, model_size="large-v3", language="es",
             f.write(f"{clip_id}|{text}\n")
     say(f"LISTO: {len(rows)} frases -> {meta}")
     return str(out)
+
+
+def fila_multi(wav_id: str, speaker: str, text: str) -> str:
+    """Fila de metadata multi-hablante: id|speaker|text (sin '|' en el texto)."""
+    return f"{wav_id}|{speaker}|{text.replace('|', '').strip()}"
+
+
+def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
+                               espeak="es-419", progress=None, stop_flag=None):
+    """speakers: {nombre_hablante: [audios/carpetas]}. Arma wavs/ + metadata.csv
+    (id|speaker|text). Devuelve la cantidad de hablantes."""
+    out = Path(out_dir)
+    wavs = out / "wavs"
+    wavs.mkdir(parents=True, exist_ok=True)
+    filas = []
+    for speaker, entradas in speakers.items():
+        if stop_flag is not None and stop_flag.is_set():
+            break
+        if progress:
+            progress(f"Procesando hablante: {speaker}")
+        # build_dataset arma clips+texto en una carpeta temporal por hablante
+        tmp = out / f"_tmp_{speaker}"
+        build_dataset(entradas, str(tmp), model_size=model_size,
+                      progress=progress, stop_flag=stop_flag)
+        # mover wavs con prefijo de hablante y volcar filas con la columna speaker
+        import csv as _csv
+        with open(tmp / "metadata.csv", "r", encoding="utf-8") as f:
+            for row in _csv.reader(f, delimiter="|"):
+                if len(row) < 2:
+                    continue
+                wid, text = row[0], row[-1]
+                new_id = f"{speaker}_{wid}"
+                (tmp / "wavs" / f"{wid}.wav").replace(wavs / f"{new_id}.wav")
+                filas.append(fila_multi(new_id, speaker, text))
+    (out / "metadata.csv").write_text("\n".join(filas) + "\n", encoding="utf-8")
+    return len(speakers)
