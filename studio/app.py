@@ -1,0 +1,44 @@
+# studio/app.py
+from __future__ import annotations
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+try:
+    _log = open(ROOT / "studio.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = _log; sys.stderr = _log
+except Exception:
+    pass
+
+import wx  # noqa: E402
+from studio.nvda import NVDAController  # noqa: E402
+
+
+class StudioFrame(wx.Frame):
+    def __init__(self):
+        super().__init__(None, title="Piper Studio", size=(820, 620))
+        self.nvda = NVDAController()
+        self.nb = wx.Notebook(self)
+        # Las secciones reales se agregan en tareas siguientes:
+        self._add_placeholder("Entrenar")
+        self._add_placeholder("Comparar")
+        self._add_placeholder("Exportar")
+        self.Centre(); self.Show()
+        self.nvda.speak("Piper Studio abierto", True)
+
+    def _add_placeholder(self, label):
+        p = wx.Panel(self.nb)
+        s = wx.BoxSizer(wx.VERTICAL)
+        s.Add(wx.StaticText(p, label=f"Sección {label} (en construcción)"), 0, wx.ALL, 10)
+        p.SetSizer(s)
+        self.nb.AddPage(p, label)
+
+
+def main():
+    app = wx.App(False)
+    StudioFrame()
+    app.MainLoop()
+
+
+if __name__ == "__main__":
+    main()
