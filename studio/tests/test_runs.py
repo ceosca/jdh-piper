@@ -96,6 +96,13 @@ class TestArgv(unittest.TestCase):
         self.assertIn("--paciencia", argv)
         self.assertIn("20", argv)
 
+    def test_autostop_pasa_dataset_explicito(self):
+        # el nombre de la voz puede no coincidir con la carpeta del dataset
+        argv = build_train_argv("py.exe", Path("."),
+                                self._mk(nombre="mario", dataset="datasets/mario-castanieda"))
+        self.assertIn("--dataset", argv)
+        self.assertIn("datasets/mario-castanieda", argv)
+
     def test_manual_usa_train_run_sin_earlystop(self):
         argv = build_train_argv("py.exe", Path("."), self._mk(auto_stop=False, max_epochs=2000))
         joined = " ".join(argv)

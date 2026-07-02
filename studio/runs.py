@@ -123,9 +123,12 @@ def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
         return argv
     ckpt = st.resume_ckpt or st.base_ckpt
     if st.auto_stop:
-        # entrenar.py trae EarlyStopping(val_mel) + checkpoints + best
+        # entrenar.py trae EarlyStopping(val_mel) + checkpoints + best.
+        # Pasar --dataset explícito: el nombre de la voz puede no coincidir con
+        # la carpeta del dataset (ej. voz "mario", dataset "mario-castanieda").
         argv = [py, str(rp / "entrenar.py"),
                 "--voz", st.nombre,
+                "--dataset", ds,
                 "--base", ckpt,
                 "--max-epochs", str(st.max_epochs),
                 "--paciencia", str(st.paciencia),
