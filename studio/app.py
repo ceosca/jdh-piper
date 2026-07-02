@@ -29,13 +29,6 @@ class StudioFrame(wx.Frame):
         self.Centre(); self.Show()
         self.nvda.speak("Piper Studio abierto", True)
 
-    def _add_placeholder(self, label):
-        p = wx.Panel(self.nb)
-        s = wx.BoxSizer(wx.VERTICAL)
-        s.Add(wx.StaticText(p, label=f"Sección {label} (en construcción)"), 0, wx.ALL, 10)
-        p.SetSizer(s)
-        self.nb.AddPage(p, label)
-
 
 def main():
     app = wx.App(False)
