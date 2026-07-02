@@ -20,6 +20,7 @@ class RunState:
     auto_stop: bool = True
     paciencia: int = 12
     cada: int = 10
+    num_speakers: int = 1
     pid: int | None = None
     started_at: str = ""
     estado: str = "pausado"         # entrenando | pausado | terminado | fallo
@@ -110,6 +111,12 @@ import subprocess
 def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
     rp = Path(root_proj)
     ds = st.dataset
+    if st.modo == "base":
+        return [py, str(Path(root_proj) / "entrenar_base.py"),
+                "--dataset", st.dataset,
+                "--base-mono", st.base_ckpt,
+                "--num-speakers", str(st.num_speakers),
+                "--max-epochs", str(st.max_epochs)]
     ckpt = st.resume_ckpt or st.base_ckpt
     if st.auto_stop:
         # entrenar.py trae EarlyStopping(val_mel) + checkpoints + best

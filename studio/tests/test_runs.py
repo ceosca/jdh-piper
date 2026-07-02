@@ -112,5 +112,20 @@ class TestArgv(unittest.TestCase):
         self.assertIn("training/silvio/ckpts/last.ckpt", argv)
 
 
+class TestArgvBase(unittest.TestCase):
+    def test_modo_base_usa_entrenar_base(self):
+        from studio.runs import RunState, build_train_argv
+        from pathlib import Path
+        st = RunState(nombre="base_latino", modo="base", dataset="datasets/base_latino",
+                      base_ckpt="base_ckpt/silvio_base_clean.ckpt", max_epochs=4000,
+                      num_speakers=12)
+        argv = build_train_argv("py.exe", Path("."), st)
+        j = " ".join(argv)
+        self.assertIn("entrenar_base.py", j)
+        self.assertIn("--num-speakers", argv)
+        self.assertIn("12", argv)
+        self.assertIn("--base-mono", argv)
+
+
 if __name__ == "__main__":
     unittest.main()
