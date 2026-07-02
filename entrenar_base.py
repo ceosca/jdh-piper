@@ -35,7 +35,8 @@ def main() -> None:
     ap.add_argument("--gin-channels", type=int, default=256)
     ap.add_argument("--max-epochs", type=int, default=4000)
     ap.add_argument("--batch-size", type=int, default=12)
-    ap.add_argument("--espeak", default="es-419")
+    ap.add_argument("--espeak", default="es")  # España: preserva c/z (θ) y ll/y;
+    # cada dialecto (AR/MX/neutro asesean, España cecea) lo aprende su embedding.
     ap.add_argument("--sample-rate", type=int, default=22050)
     ap.add_argument("--voz", default=None, help="Nombre de la corrida (clave del dir de checkpoints en la GUI)")
     ap.add_argument("--resume", default=None, help="Checkpoint del que reanudar (salta la cirugía)")

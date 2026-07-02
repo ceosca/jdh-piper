@@ -86,7 +86,7 @@ Controles:
   carpetas; se asigna un `speaker_id` incremental por carpeta y se arma el dataset
   **multi-hablante** (metadata con columna de hablante, formato que pide Piper para
   `num_speakers > 1`).
-- **Acentos**: fonemización unificada **`es-419`** (español latino); chileno/
+- **Acentos**: fonemización unificada **`es`** (España — preserva c/z y ll/y; cada dialecto lo aprende su embedding); chileno/
   argentino/cubano/etc. conviven, y los `speaker embeddings` absorben la variación.
 - **Bootstrap**: el base arranca desde un checkpoint de **un solo hablante** vía
   `--resume_from_single_speaker_checkpoint` (mucho más rápido que desde cero).

@@ -191,7 +191,7 @@ def fila_multi(wav_id: str, speaker: str, text: str) -> str:
 
 
 def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
-                               espeak="es-419", progress=None, stop_flag=None):
+                               espeak="es", progress=None, stop_flag=None):
     """speakers: {nombre_hablante: [audios/carpetas]}. Arma wavs/ + metadata.csv
     (id|speaker|text). Devuelve la cantidad de hablantes."""
     out = Path(out_dir)

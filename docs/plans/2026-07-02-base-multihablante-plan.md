@@ -2,7 +2,7 @@
 
 > **Para quien ejecute:** SUB-SKILL REQUERIDA: superpowers:subagent-driven-development. Vive en `C:\ia\piper-studio` (repo git, rama nueva). Los pasos usan checkbox (`- [ ]`).
 
-**Goal:** poder entrenar un **base multi-hablante** en español latino (`es-419`) partiendo de un checkpoint de un solo hablante mediante **cirugía de pesos**: se copian los ~784 pesos acústicos/fonéticos del modelo mono a un modelo multi-hablante nuevo, y solo las ~20 "perillas de hablante" (`emb_g` + capas `cond`) arrancan de cero. Incluye armar el dataset multi-hablante, el script de entrenamiento y el modo en la GUI. **El entrenamiento real lo corre el usuario cuando tenga el corpus**; este plan construye y testea la infraestructura.
+**Goal:** poder entrenar un **base multi-hablante** en español con fonemas de España (`es`) partiendo de un checkpoint de un solo hablante mediante **cirugía de pesos**: se copian los ~784 pesos acústicos/fonéticos del modelo mono a un modelo multi-hablante nuevo, y solo las ~20 "perillas de hablante" (`emb_g` + capas `cond`) arrancan de cero. Incluye armar el dataset multi-hablante, el script de entrenamiento y el modo en la GUI. **El entrenamiento real lo corre el usuario cuando tenga el corpus**; este plan construye y testea la infraestructura.
 
 **Architecture:** un módulo puro `base_multi.py` (fusión de pesos + hparams multi, testeable) usado por `entrenar_base.py` (construye `VitsModel` multi + `VitsDataModule`, inyecta los pesos del mono con `load_state_dict`, y hace `trainer.fit` fresco con checkpoints). El armador de dataset gana un modo multi-hablante (CSV `wav|speaker|text`). La GUI (`section_train`) gana el modo "Base multi-hablante", que despacha `entrenar_base.py` vía `runs.build_train_argv`.
 
@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Windows nativo, sin WSL. Rutas con `pathlib`. `--data.num_workers 0` obligatorio (workers cuelgan en Windows).
-- Stack estándar (piper1-gpl 1.4.2 + espeak). Fonemización **`es-419`** para unificar acentos.
+- Stack estándar (piper1-gpl 1.4.2 + espeak). Fonemización **`es`** (España) para TODO el corpus: preserva las distinciones c/z (θ) y ll/y; cada dialecto (AR/MX/neutro asesean, España cecea) lo aprende su embedding de hablante.
 - Parches de carga ya conocidos: `torch.load(weights_only=False)` + `pathlib.PosixPath = pathlib.WindowsPath` (usar el patrón de `train_run.py`).
 - **Hecho verificado (grounding):** un `VitsModel` con `num_speakers=N, gin_channels=256` tiene 804 claves; **784 coinciden en nombre+forma con el checkpoint mono** (`base_ckpt/silvio_base_clean.ckpt`), 0 mismatches; las 20 nuevas son `model_g.emb_g.weight`, `model_g.dec.cond.*`, `model_g.dp.cond.*`, `model_g.enc_q.enc.cond_layer.*`, `model_g.flow.flows.N.enc.cond_layer.*`.
 - CSV multi-hablante = `wav|speaker|text` (delimitado por `|`). El modelo arma el `speaker_id_map` solo.
@@ -139,7 +139,7 @@ Expected: PASS (3 tests).
 
 **Interfaces:**
 - Consumes: `studio.base_multi.hparams_multi`/`fusionar_pesos`, `piper.train.vits.lightning.VitsModel`, `piper.train.vits.dataset.VitsDataModule`, `lightning`.
-- Produces: CLI `entrenar_base.py --dataset <dir> --base-mono <ckpt> --num-speakers N [--gin-channels 256 --max-epochs 4000 --batch-size 12 --espeak es-419]` que entrena el base y guarda checkpoints en `training/<nombre_dataset>/ckpts`.
+- Produces: CLI `entrenar_base.py --dataset <dir> --base-mono <ckpt> --num-speakers N [--gin-channels 256 --max-epochs 4000 --batch-size 12 --espeak es]` que entrena el base y guarda checkpoints en `training/<nombre_dataset>/ckpts`.
 
 - [ ] **Step 1: implementar `entrenar_base.py`**
 
@@ -180,7 +180,7 @@ def main() -> None:
     ap.add_argument("--gin-channels", type=int, default=256)
     ap.add_argument("--max-epochs", type=int, default=4000)
     ap.add_argument("--batch-size", type=int, default=12)
-    ap.add_argument("--espeak", default="es-419")
+    ap.add_argument("--espeak", default="es")
     ap.add_argument("--sample-rate", type=int, default=22050)
     args = ap.parse_args()
 
@@ -244,7 +244,7 @@ Expected: `OK copiadas 784 nuevas 20` (confirma la cirugía + carga sin error). 
 
 **Interfaces:**
 - Consumes: las funciones existentes de `dataset_builder` (silencios + whisper) por carpeta.
-- Produces: `build_multispeaker_dataset(speakers: dict[str, list[str]], out_dir, model_size="large-v3", espeak="es-419", progress=None, stop_flag=None) -> int` — `speakers` mapea nombre_de_hablante → lista de audios/carpetas; arma `out_dir/wavs/` y `out_dir/metadata.csv` con filas `id|speaker|text`; devuelve la **cantidad de hablantes**. Además una pura `fila_multi(wav_id, speaker, text) -> str` que produce `"wav_id|speaker|text"`.
+- Produces: `build_multispeaker_dataset(speakers: dict[str, list[str]], out_dir, model_size="large-v3", espeak="es", progress=None, stop_flag=None) -> int` — `speakers` mapea nombre_de_hablante → lista de audios/carpetas; arma `out_dir/wavs/` y `out_dir/metadata.csv` con filas `id|speaker|text`; devuelve la **cantidad de hablantes**. Además una pura `fila_multi(wav_id, speaker, text) -> str` que produce `"wav_id|speaker|text"`.
 
 - [ ] **Step 1: test de la fila multi (falla)**
 
@@ -284,7 +284,7 @@ def fila_multi(wav_id: str, speaker: str, text: str) -> str:
 
 
 def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
-                               espeak="es-419", progress=None, stop_flag=None):
+                               espeak="es", progress=None, stop_flag=None):
     """speakers: {nombre_hablante: [audios/carpetas]}. Arma wavs/ + metadata.csv
     (id|speaker|text). Devuelve la cantidad de hablantes."""
     from pathlib import Path
@@ -315,7 +315,7 @@ def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
     return len(speakers)
 ```
 
-(Nota: `build_dataset` ya existe y acepta `espeak`/idioma vía whisper; la fonemización `es-419` la fija el entrenamiento, no el armado. Si `build_dataset` no expone `espeak`, omitir ese kwarg — el armado solo transcribe.)
+(Nota: `build_dataset` ya existe y acepta `espeak`/idioma vía whisper; la fonemización `es` la fija el entrenamiento, no el armado. Si `build_dataset` no expone `espeak`, omitir ese kwarg — el armado solo transcribe.)
 
 - [ ] **Step 4: correr y ver pasar**
 
@@ -429,6 +429,6 @@ class TestArgvBase(unittest.TestCase):
 - **Cobertura de la spec (backend multi-hablante):** cirugía de pesos (T1, grounded 784/20) ✓; entrenamiento con inyección (T2) ✓; dataset `wav|speaker|text` (T3) ✓; despacho desde runs (T4) ✓; modo en la GUI (T5) ✓.
 - **Sin placeholders:** código real + tests + comandos con salida esperada (incl. la verificación `OK copiadas 784 nuevas 20`).
 - **Consistencia de tipos:** `RunState.num_speakers` (T4) lo usan `build_train_argv` (T4) y `section_train._current_state` (T5); `entrenar_base.py` (T2) consume `hparams_multi`/`fusionar_pesos` (T1) con las firmas definidas.
-- **Fuera de alcance (del usuario):** juntar el corpus multi-acento y correr el entrenamiento real (GPU, días, pausable con la GUI ya existente); elegir `gin_channels` (default 256). La fonemización `es-419` la fija `entrenar_base.py`.
+- **Fuera de alcance (del usuario):** juntar el corpus multi-acento y correr el entrenamiento real (GPU, días, pausable con la GUI ya existente); elegir `gin_channels` (default 256). La fonemización `es` la fija `entrenar_base.py`.
 - **Riesgo:** `VitsDataModule`/`VitsModel` instanciados directo (no vía LightningCLI) — la verificación de construcción de T2 lo cubre; el `fit` real puede requerir ajustes menores de args del DataModule (validarlos en la primera corrida del humano).
 ```
