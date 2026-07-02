@@ -158,22 +158,28 @@ class TrainPanel(wx.Panel):
         self.runs_list.Set([self._describe(s) for s in self._runs])
 
     def _tick(self, e):
-        changed = False
-        for st in runs.list_runs(TRAIN_ROOT):
-            ep = runs.latest_epoch(runs.run_dir(TRAIN_ROOT, st.nombre)) or 0
-            hito = ep // self._every
-            prev_estado, prev_hito = self._seen.get(st.nombre, (None, None))
-            if prev_estado is None:
-                self._seen[st.nombre] = (st.estado, hito); continue
-            if st.estado != prev_estado:
-                msg = {"terminado": "terminó", "pausado": "se pausó",
-                       "fallo": "falló", "entrenando": "entrenando"}.get(st.estado, st.estado)
-                self.nvda.speak(f"{st.nombre}: {msg}", False); changed = True
-            elif hito != prev_hito and st.estado == "entrenando":
-                self.nvda.speak(f"{st.nombre}: época {hito * self._every}", False)
-            self._seen[st.nombre] = (st.estado, hito)
-        if changed:
-            self.refresh_runs()
+        try:
+            changed = False
+            for st in runs.list_runs(TRAIN_ROOT):
+                try:
+                    ep = runs.latest_epoch(runs.run_dir(TRAIN_ROOT, st.nombre)) or 0
+                    hito = ep // self._every
+                    prev_estado, prev_hito = self._seen.get(st.nombre, (None, None))
+                    if prev_estado is None:
+                        self._seen[st.nombre] = (st.estado, hito); continue
+                    if st.estado != prev_estado:
+                        msg = {"terminado": "terminó", "pausado": "se pausó",
+                               "fallo": "falló", "entrenando": "entrenando"}.get(st.estado, st.estado)
+                        self.nvda.speak(f"{st.nombre}: {msg}", False); changed = True
+                    elif hito != prev_hito and st.estado == "entrenando":
+                        self.nvda.speak(f"{st.nombre}: época {hito * self._every}", False)
+                    self._seen[st.nombre] = (st.estado, hito)
+                except Exception:
+                    continue
+            if changed:
+                self.refresh_runs()
+        except Exception:
+            pass
 
     def _on_howto(self, e):
         self.refresh_runs()
