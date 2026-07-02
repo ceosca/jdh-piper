@@ -1,7 +1,8 @@
 # studio/tests/test_runs.py
 import json, unittest, tempfile, os
 from pathlib import Path
-from studio.runs import RunState, save_run, load_run, list_runs, latest_epoch, run_dir, pid_alive
+from studio.runs import (RunState, save_run, load_run, list_runs, latest_epoch, run_dir,
+                          pid_alive, pick_resume_ckpt)
 
 
 class TestRuns(unittest.TestCase):
@@ -51,6 +52,32 @@ class TestRuns(unittest.TestCase):
         self.assertEqual(len(runs), 1)
         # PID muerto => estado deja de ser "entrenando"
         self.assertNotEqual(runs[0].estado, "entrenando")
+
+
+class TestPickResumeCkpt(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def test_prefers_last_ckpt_when_it_exists(self):
+        rd = run_dir(self.tmp, "silvio")
+        ck = rd / "ckpts"
+        ck.mkdir(parents=True)
+        (ck / "last.ckpt").write_text("x")
+        (ck / "silvio-epoch=99.ckpt").write_text("x")
+        self.assertEqual(pick_resume_ckpt(rd, "base.ckpt"), str(ck / "last.ckpt"))
+
+    def test_falls_back_to_highest_epoch_when_no_last_ckpt(self):
+        rd = run_dir(self.tmp, "silvio")
+        ck = rd / "ckpts"
+        ck.mkdir(parents=True)
+        (ck / "voz-epoch=99.ckpt").write_text("x")
+        (ck / "voz-epoch=299.ckpt").write_text("x")
+        self.assertEqual(pick_resume_ckpt(rd, "base.ckpt"), str(ck / "voz-epoch=299.ckpt"))
+
+    def test_falls_back_to_base_ckpt_when_ckpts_dir_empty(self):
+        rd = run_dir(self.tmp, "silvio")
+        (rd / "ckpts").mkdir(parents=True)
+        self.assertEqual(pick_resume_ckpt(rd, "base.ckpt"), "base.ckpt")
 
 
 from studio.runs import build_train_argv

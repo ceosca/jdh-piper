@@ -136,8 +136,8 @@ class TrainPanel(wx.Panel):
         if not st:
             self.set_status("Elegí una corrida de la lista."); return
         st.resume_ckpt = None
-        runs.resume(TRAIN_ROOT, ROOT, st, PY)
-        self.set_status(f"Reanudada «{st.nombre}».")
+        st = runs.resume(TRAIN_ROOT, ROOT, st, PY)
+        self.set_status(f"Reanudada «{st.nombre}» desde {Path(st.resume_ckpt).name}.")
         self.refresh_runs()
 
     def _on_stop(self, e):

@@ -25,7 +25,7 @@ class ComparePanel(wx.Panel):
                                 style=wx.TE_MULTILINE, size=(-1, 60), name="Frase")
         s.Add(self.text, 0, wx.ALL | wx.EXPAND, 6)
         self.gen_btn = wx.Button(self, label="&Generar WAVs")
-        self.open_btn = wx.Button(self, label="Abrir carpeta")
+        self.open_btn = wx.Button(self, label="Abrir &carpeta")
         s.Add(self.gen_btn, 0, wx.ALL, 4); s.Add(self.open_btn, 0, wx.ALL, 4)
         self.SetSizer(s)
         self.gen_btn.Bind(wx.EVT_BUTTON, self._on_gen)
@@ -58,4 +58,5 @@ class ComparePanel(wx.Panel):
         try:
             os.startfile(str(self._out(self.voz.GetValue().strip())))  # noqa: S606
         except Exception:
-            pass
+            self.status.SetLabel("Todavía no hay carpeta para abrir. Generá los WAVs primero.")
+            self.nvda.speak("Todavía no hay carpeta para abrir", True)

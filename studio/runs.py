@@ -144,16 +144,16 @@ def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
 
 
 def _spawn_detached(argv: list[str], cwd: Path, log_path: Path) -> int:
-    log = open(log_path, "a", encoding="utf-8", buffering=1)
-    kwargs = dict(cwd=str(cwd), stdout=log, stderr=log, stdin=subprocess.DEVNULL)
-    if sys.platform == "win32":
-        DETACHED_PROCESS = 0x00000008
-        CREATE_NEW_PROCESS_GROUP = 0x00000200
-        kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-    else:
-        kwargs["start_new_session"] = True
-    p = subprocess.Popen(argv, **kwargs)
-    return p.pid
+    with open(log_path, "a", encoding="utf-8", buffering=1) as log:
+        kwargs = dict(cwd=str(cwd), stdout=log, stderr=log, stdin=subprocess.DEVNULL)
+        if sys.platform == "win32":
+            DETACHED_PROCESS = 0x00000008
+            CREATE_NEW_PROCESS_GROUP = 0x00000200
+            kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        else:
+            kwargs["start_new_session"] = True
+        p = subprocess.Popen(argv, **kwargs)
+        return p.pid
 
 
 def launch(root_runs: Path, root_proj: Path, st: RunState, py: str) -> RunState:
@@ -191,7 +191,27 @@ def pause(root_runs: Path, st: RunState) -> RunState:
     return st
 
 
+def pick_resume_ckpt(rd: Path, base_ckpt: str) -> str:
+    rd = Path(rd)
+    last = rd / "ckpts" / "last.ckpt"
+    if last.exists():
+        return str(last)
+    ck = rd / "ckpts"
+    best_path = None
+    best_epoch = -1
+    if ck.is_dir():
+        for f in ck.glob("*.ckpt"):
+            m = re.search(r"epoch=(\d+)", f.stem)
+            if m:
+                epoch = int(m.group(1))
+                if epoch > best_epoch:
+                    best_epoch = epoch
+                    best_path = f
+    if best_path is not None:
+        return str(best_path)
+    return base_ckpt
+
+
 def resume(root_runs: Path, root_proj: Path, st: RunState, py: str) -> RunState:
-    last = run_dir(root_runs, st.nombre) / "ckpts" / "last.ckpt"
-    st.resume_ckpt = st.resume_ckpt or (str(last) if last.exists() else st.base_ckpt)
+    st.resume_ckpt = st.resume_ckpt or pick_resume_ckpt(run_dir(root_runs, st.nombre), st.base_ckpt)
     return launch(root_runs, root_proj, st, py)

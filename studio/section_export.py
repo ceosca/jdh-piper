@@ -58,11 +58,16 @@ class ExportPanel(wx.Panel):
     def _exported(self, voz, code):
         if code == 0:
             cfg = ROOT / "datasets" / voz / "config.json"
-            shutil.copyfile(cfg, self._onnx_path(voz).with_suffix(".onnx.json"))
-            self.status.SetLabel("Exportado. Ya podés instalar.")
-            self.nvda.speak("Exportado", True)
+            try:
+                shutil.copyfile(cfg, self._onnx_path(voz).with_suffix(".onnx.json"))
+                self.status.SetLabel("Exportado. Ya podés instalar.")
+                self.nvda.speak("Exportado", True)
+            except (FileNotFoundError, OSError):
+                self.status.SetLabel("Exportado, pero falta config.json del dataset.")
+                self.nvda.speak("Exportado, pero falta el config del dataset", True)
         else:
             self.status.SetLabel("Error exportando (ver studio.log).")
+            self.nvda.speak("Error exportando", True)
 
     def _on_install(self, e):
         voz = self.voz.GetValue().strip()
