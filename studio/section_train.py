@@ -20,6 +20,11 @@ class TrainPanel(wx.Panel):
         self.dataset = ""
         self._build()
         self.refresh_runs()
+        self._seen = {}   # nombre -> (estado, hito_epoca)
+        self._every = 100
+        self._timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._tick, self._timer)
+        self._timer.Start(15000)
 
     def _build(self):
         s = wx.BoxSizer(wx.VERTICAL)
@@ -76,6 +81,8 @@ class TrainPanel(wx.Panel):
         self.resume_btn.Bind(wx.EVT_BUTTON, self._on_resume)
         self.stop_btn.Bind(wx.EVT_BUTTON, self._on_stop)
         self.howto_btn.Bind(wx.EVT_BUTTON, self._on_howto)
+
+        self.Bind(wx.EVT_WINDOW_DESTROY, lambda e: (self._timer.Stop(), e.Skip()))
 
     def _toggle_auto(self, e):
         on = self.auto.GetValue()
@@ -149,6 +156,24 @@ class TrainPanel(wx.Panel):
     def refresh_runs(self):
         self._runs = runs.list_runs(TRAIN_ROOT)
         self.runs_list.Set([self._describe(s) for s in self._runs])
+
+    def _tick(self, e):
+        changed = False
+        for st in runs.list_runs(TRAIN_ROOT):
+            ep = runs.latest_epoch(runs.run_dir(TRAIN_ROOT, st.nombre)) or 0
+            hito = ep // self._every
+            prev_estado, prev_hito = self._seen.get(st.nombre, (None, None))
+            if prev_estado is None:
+                self._seen[st.nombre] = (st.estado, hito); continue
+            if st.estado != prev_estado:
+                msg = {"terminado": "terminó", "pausado": "se pausó",
+                       "fallo": "falló", "entrenando": "entrenando"}.get(st.estado, st.estado)
+                self.nvda.speak(f"{st.nombre}: {msg}", False); changed = True
+            elif hito != prev_hito and st.estado == "entrenando":
+                self.nvda.speak(f"{st.nombre}: época {hito * self._every}", False)
+            self._seen[st.nombre] = (st.estado, hito)
+        if changed:
+            self.refresh_runs()
 
     def _on_howto(self, e):
         self.refresh_runs()
