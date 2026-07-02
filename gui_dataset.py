@@ -23,7 +23,7 @@ except Exception:
 
 import wx  # noqa: E402
 
-from dataset_builder import build_dataset  # noqa: E402
+from dataset_builder import build_dataset, build_multispeaker_dataset  # noqa: E402
 
 DATASETS_DIR = ROOT / "datasets"
 
@@ -80,6 +80,16 @@ class DatasetFrame(wx.Frame):
             r.Add(b, 0, wx.ALL, 4)
         s.Add(r, 0, wx.ALL, 2)
 
+        # Modo: una voz (LJSpeech id|text) o multi-hablante para el base
+        # (cada carpeta/archivo agregado = un hablante; CSV id|speaker|text).
+        r_modo = wx.BoxSizer(wx.HORIZONTAL)
+        modo_lbl = wx.StaticText(p, label="Modo:")  # etiqueta ANTES del control (NVDA)
+        self.modo = wx.Choice(p, choices=["Una voz", "Multi-hablante (base)"], name="Modo del dataset")
+        self.modo.SetSelection(0)
+        r_modo.Add(modo_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        r_modo.Add(self.modo, 0, wx.ALL, 4)
+        s.Add(r_modo, 0, wx.ALL, 2)
+
         r2 = wx.BoxSizer(wx.HORIZONTAL)
         self.name_ctrl = wx.TextCtrl(p, value="mivoz", name="Nombre del dataset")
         self.model_choice = wx.Choice(p, choices=["large-v3", "medium", "small"], name="Modelo whisper")
@@ -100,9 +110,11 @@ class DatasetFrame(wx.Frame):
         s.Add(r3, 0, wx.ALL, 4)
         p.SetSizer(s)
 
-        for c, l in [(self.inp_list, "Audios"), (self.name_ctrl, "Nombre del dataset"),
+        for c, l in [(self.inp_list, "Audios"), (self.modo, "Modo"),
+                     (self.name_ctrl, "Nombre del dataset"),
                      (self.model_choice, "Modelo whisper")]:
             c.Bind(wx.EVT_SET_FOCUS, lambda e, c=c, l=l: self._focus(e, c, l))
+        self.modo.Bind(wx.EVT_CHOICE, self._on_modo)
         self.add_file_btn.Bind(wx.EVT_BUTTON, self._on_add_file)
         self.add_dir_btn.Bind(wx.EVT_BUTTON, self._on_add_dir)
         self.rm_btn.Bind(wx.EVT_BUTTON, self._on_remove)
@@ -119,6 +131,12 @@ class DatasetFrame(wx.Frame):
 
     def set_status_ts(self, t):
         wx.CallAfter(self.set_status, t)
+
+    def _on_modo(self, e):
+        if self.modo.GetSelection() == 1:
+            self.set_status("Modo multi-hablante: cada carpeta/archivo que agregues es un hablante.")
+        else:
+            self.set_status("Modo una voz: todos los audios son de la misma voz.")
 
     def _refresh_inputs(self):
         self.inp_list.Set([Path(i).name + ("  [carpeta]" if Path(i).is_dir() else "") for i in self.inputs])
@@ -156,15 +174,27 @@ class DatasetFrame(wx.Frame):
         name = (self.name_ctrl.GetValue().strip() or "mivoz")
         out = str(DATASETS_DIR / name)
         model = self.model_choice.GetStringSelection()
+        multi = self.modo.GetSelection() == 1
         self._busy = True; self._stop.clear()
         self.build_btn.Enable(False); self.stop_btn.Enable(True)
-        self.set_status("Armando dataset… (whisper large-v3 puede tardar)")
-        threading.Thread(target=self._worker, args=(list(self.inputs), out, model), daemon=True).start()
+        self.set_status("Armando dataset… (whisper puede tardar)")
+        threading.Thread(target=self._worker, args=(list(self.inputs), out, model, multi), daemon=True).start()
 
-    def _worker(self, inputs, out, model):
+    def _worker(self, inputs, out, model, multi):
         try:
-            build_dataset(inputs, out, model_size=model, progress=self.set_status_ts, stop_flag=self._stop)
-            wx.CallAfter(self._done, out)
+            if multi:
+                # Cada entrada = un hablante (carpeta -> su nombre; archivo -> su stem).
+                speakers: dict[str, list[str]] = {}
+                for inp in inputs:
+                    pth = Path(inp)
+                    key = pth.name if pth.is_dir() else pth.stem
+                    speakers.setdefault(key, []).append(inp)
+                n = build_multispeaker_dataset(speakers, out, model_size=model,
+                                               progress=self.set_status_ts, stop_flag=self._stop)
+                wx.CallAfter(self._done_multi, out, n)
+            else:
+                build_dataset(inputs, out, model_size=model, progress=self.set_status_ts, stop_flag=self._stop)
+                wx.CallAfter(self._done, out)
         except Exception as ex:
             traceback.print_exc()
             wx.CallAfter(self._done_err, ex)
@@ -172,6 +202,10 @@ class DatasetFrame(wx.Frame):
     def _done(self, out):
         self._busy = False; self.build_btn.Enable(True); self.stop_btn.Enable(False)
         self.set_status(f"Dataset listo en {out}. Revisá metadata.csv y a entrenar.")
+
+    def _done_multi(self, out, n):
+        self._busy = False; self.build_btn.Enable(True); self.stop_btn.Enable(False)
+        self.set_status(f"Dataset multi-hablante listo en {out}: {n} hablantes. A entrenar el base.")
 
     def _done_err(self, ex):
         self._busy = False; self.build_btn.Enable(True); self.stop_btn.Enable(False)
