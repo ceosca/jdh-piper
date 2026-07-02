@@ -1,0 +1,20 @@
+# Entornos y binarios pesados
+env/
+repo/
+__pycache__/
+*.pyc
+
+# Datos y artefactos de entrenamiento (grandes)
+training/
+datasets/
+base_ckpt/
+checkpoints/
+*.ckpt
+*.onnx
+*.onnx.json
+*.pt
+*.wav
+*.m4a
+
+# Logs
+*.log
