@@ -12,6 +12,7 @@ except Exception:
 
 import wx  # noqa: E402
 from studio.nvda import NVDAController  # noqa: E402
+from studio.section_train import TrainPanel  # noqa: E402
 
 
 class StudioFrame(wx.Frame):
@@ -20,7 +21,7 @@ class StudioFrame(wx.Frame):
         self.nvda = NVDAController()
         self.nb = wx.Notebook(self)
         # Las secciones reales se agregan en tareas siguientes:
-        self._add_placeholder("Entrenar")
+        self.nb.AddPage(TrainPanel(self.nb, self.nvda), "Entrenar")
         self._add_placeholder("Comparar")
         self._add_placeholder("Exportar")
         self.Centre(); self.Show()
