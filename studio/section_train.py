@@ -1,6 +1,8 @@
 # studio/section_train.py
 from __future__ import annotations
 import datetime as dt
+import subprocess
+import threading
 from pathlib import Path
 
 import wx
@@ -177,7 +179,7 @@ class TrainPanel(wx.Panel):
         self.set_status(f"Detenida «{st.nombre}»."); self.refresh_runs()
 
     def _describe(self, st: runs.RunState) -> str:
-        ep = runs.latest_epoch(runs.run_dir(TRAIN_ROOT, st.nombre))
+        ep = runs.leer_epoca(runs.run_dir(TRAIN_ROOT, st.nombre))
         ep_s = f"época {ep}" if ep is not None else "sin checkpoints"
         return f"{st.nombre} — {st.estado} — {ep_s}"
 
@@ -190,7 +192,7 @@ class TrainPanel(wx.Panel):
             changed = False
             for st in runs.list_runs(TRAIN_ROOT):
                 try:
-                    ep = runs.latest_epoch(runs.run_dir(TRAIN_ROOT, st.nombre)) or 0
+                    ep = runs.leer_epoca(runs.run_dir(TRAIN_ROOT, st.nombre)) or 0
                     hito = ep // self._every
                     prev_estado, prev_hito = self._seen.get(st.nombre, (None, None))
                     if prev_estado is None:
@@ -214,4 +216,24 @@ class TrainPanel(wx.Panel):
         st = self._selected_run() or (self._runs[0] if self._runs else None)
         if not st:
             self.set_status("No hay corridas."); return
-        self.set_status(self._describe(st))
+        rd = runs.run_dir(TRAIN_ROOT, st.nombre)
+        ep = runs.leer_epoca(rd)
+        if ep is not None:
+            self.set_status(f"{st.nombre} — {st.estado} — época {ep}")
+            return
+        # sin fuente barata todavía (ej. corrida sin epoch.txt): leer la época del
+        # checkpoint más nuevo en un hilo (subproceso, para no cargar torch en la GUI).
+        self.set_status(f"{st.nombre} — {st.estado} — consultando época…")
+        threading.Thread(target=self._howto_ckpt,
+                         args=(st.nombre, st.estado, str(rd)), daemon=True).start()
+
+    def _howto_ckpt(self, nombre, estado, rd):
+        out = ""
+        try:
+            r = subprocess.run([PY, str(ROOT / "epoca_ckpt.py"), rd],
+                               capture_output=True, text=True, timeout=90)
+            out = (r.stdout or "").strip().splitlines()[-1] if r.stdout.strip() else ""
+        except Exception:
+            out = ""
+        ep_s = f"época {out}" if out.isdigit() else "sin checkpoints todavía"
+        wx.CallAfter(self.set_status, f"{nombre} — {estado} — {ep_s}")

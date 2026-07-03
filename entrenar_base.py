@@ -81,12 +81,14 @@ def main() -> None:
         num_workers=0,
     )
 
+    from studio.progress import EscritorEpoca
     trainer = L.Trainer(
         max_epochs=args.max_epochs, accelerator="gpu", devices=1,
         default_root_dir=str(ROOT / "training" / nombre),
         callbacks=[ModelCheckpoint(dirpath=str(ckpts), every_n_epochs=50,
                                    save_top_k=-1, save_last=True,
-                                   filename=nombre + "-{epoch}")],
+                                   filename=nombre + "-{epoch}"),
+                   EscritorEpoca(str(ROOT / "training" / nombre / "epoch.txt"))],
     )
     trainer.fit(model, data, ckpt_path=resume_ckpt)
 

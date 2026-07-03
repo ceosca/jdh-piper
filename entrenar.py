@@ -74,6 +74,11 @@ def main() -> None:
             "patience": args.paciencia, "min_delta": 0.0,
         },
     }
+    # Escribe la época en vivo (fuente barata para la GUI: "¿Cómo va?" + lista).
+    epoca_cb = {
+        "class_path": "studio.progress.EscritorEpoca",
+        "init_args": {"path": str(ROOT / "training" / args.voz / "epoch.txt")},
+    }
 
     cmd = [
         PY, str(ROOT / "train_run.py"), "fit",
@@ -94,6 +99,7 @@ def main() -> None:
         "--trainer.callbacks+", json.dumps(ckpt_cb),
         "--trainer.callbacks+", json.dumps(best_cb),
         "--trainer.callbacks+", json.dumps(early_cb),
+        "--trainer.callbacks+", json.dumps(epoca_cb),
     ]
     print(f"Entrenando «{args.voz}»: early-stop en val_mel "
           f"(paciencia {args.paciencia} × cada {args.cada} épocas), "

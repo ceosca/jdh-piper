@@ -86,6 +86,18 @@ def latest_epoch(rd: Path) -> int | None:
     return max(epochs) if epochs else None
 
 
+def leer_epoca(rd: Path) -> int | None:
+    """Época en vivo, barata: epoch.txt (lo escribe el entrenamiento cada época) ->
+    si no, el nombre de checkpoint más alto (epoch=N) -> None."""
+    try:
+        p = Path(rd) / "epoch.txt"
+        if p.exists():
+            return int(p.read_text(encoding="utf-8").strip())
+    except Exception:
+        pass
+    return latest_epoch(rd)
+
+
 def list_runs(root: Path) -> list[RunState]:
     root = Path(root)
     out: list[RunState] = []
@@ -140,6 +152,9 @@ def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
               '"init_args":{"dirpath":"%s","every_n_epochs":100,'
               '"save_top_k":-1,"save_last":true,"filename":"%s-{epoch}"}}'
               % (ck.as_posix(), st.nombre))
+        ep_txt = (rp / "training" / st.nombre / "epoch.txt").as_posix()
+        ep_cb = ('{"class_path":"studio.progress.EscritorEpoca",'
+                 '"init_args":{"path":"%s"}}' % ep_txt)
         argv = [py, str(rp / "train_run.py"), "fit",
                 "--data.voice_name", st.nombre,
                 "--data.csv_path", f"{ds}/metadata.csv",
@@ -153,7 +168,8 @@ def build_train_argv(py: str, root_proj: Path, st: RunState) -> list[str]:
                 "--trainer.max_epochs", str(st.max_epochs),
                 "--trainer.accelerator", "gpu", "--trainer.devices", "1",
                 "--trainer.default_root_dir", str(rp / "training" / st.nombre),
-                "--trainer.callbacks+", cb]
+                "--trainer.callbacks+", cb,
+                "--trainer.callbacks+", ep_cb]
     return argv
 
 

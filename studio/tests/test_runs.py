@@ -147,5 +147,28 @@ class TestArgvBase(unittest.TestCase):
         self.assertIn(resume_path, argv)
 
 
+class TestLeerEpoca(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def test_epoch_txt_gana_sobre_nombre(self):
+        from studio.runs import leer_epoca, run_dir
+        rd = run_dir(self.tmp, "v"); (rd / "ckpts").mkdir(parents=True)
+        (rd / "ckpts" / "v-epoch=50.ckpt").write_text("x")
+        (rd / "epoch.txt").write_text("123")
+        self.assertEqual(leer_epoca(rd), 123)
+
+    def test_fallback_al_nombre_sin_epoch_txt(self):
+        from studio.runs import leer_epoca, run_dir
+        rd = run_dir(self.tmp, "v2"); (rd / "ckpts").mkdir(parents=True)
+        (rd / "ckpts" / "v2-epoch=77.ckpt").write_text("x")
+        self.assertEqual(leer_epoca(rd), 77)
+
+    def test_none_si_no_hay_nada(self):
+        from studio.runs import leer_epoca, run_dir
+        rd = run_dir(self.tmp, "v3"); (rd / "ckpts").mkdir(parents=True)
+        self.assertIsNone(leer_epoca(rd))
+
+
 if __name__ == "__main__":
     unittest.main()
