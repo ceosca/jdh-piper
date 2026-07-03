@@ -264,12 +264,12 @@ class TrainPanel(wx.Panel):
         mejor = runs.leer_mejor(rd)
         if ep is not None and mejor is not None:
             self._decir_estado(st, ep, mejor); return
-        # falta época o mejor (corrida vieja): leer ambos de los checkpoints (subproceso).
+        # falta época o mejor (corrida vieja): leer de los checkpoints (subproceso).
         self.set_status(f"{st.nombre} — {st.estado} — consultando…")
         threading.Thread(target=self._howto_ckpt,
-                         args=(st.nombre, st.estado, str(rd)), daemon=True).start()
+                         args=(st.nombre, st.estado, str(rd), ep), daemon=True).start()
 
-    def _howto_ckpt(self, nombre, estado, rd):
+    def _howto_ckpt(self, nombre, estado, rd, ep_vivo=None):
         ep = None; mejor = None
         try:
             r = subprocess.run([PY, str(ROOT / "epoca_ckpt.py"), rd],
@@ -282,6 +282,8 @@ class TrainPanel(wx.Panel):
                     mejor = (p[1], p[2])
         except Exception:
             pass
+        if ep_vivo is not None:       # preferir la época en vivo (epoch.txt) si la hay
+            ep = str(ep_vivo)
         if ep:
             msg = f"{nombre} — {estado} — época {ep}"
             if mejor:
