@@ -30,8 +30,8 @@ def main() -> None:
     ap.add_argument("--base", default=str(DEFAULT_BASE), help="Checkpoint base saneado")
     ap.add_argument("--max-epochs", type=int, default=2000,
                     help="Tope duro; el early-stop normalmente corta antes")
-    ap.add_argument("--paciencia", type=int, default=12,
-                    help="Validaciones sin mejora de val_mel antes de parar")
+    ap.add_argument("--paciencia", type=int, default=200,
+                    help="ÉPOCAS sin mejorar val_mel antes de parar (se cuentan sobre el mejor)")
     ap.add_argument("--cada", type=int, default=10, help="Validar cada N épocas")
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--sample-rate", type=int, default=22050)
@@ -67,11 +67,14 @@ def main() -> None:
             "save_top_k": 1, "filename": f"{args.voz}-best",
         },
     }
+    # EarlyStopping cuenta VALIDACIONES (exámenes), no épocas. La UI usa ÉPOCAS,
+    # así que convertimos: exámenes = épocas_de_paciencia / cada-cuántas-validamos.
+    exams = max(1, args.paciencia // args.cada)
     early_cb = {
         "class_path": "lightning.pytorch.callbacks.EarlyStopping",
         "init_args": {
             "monitor": "val_mel", "mode": "min",
-            "patience": args.paciencia, "min_delta": 0.0,
+            "patience": exams, "min_delta": 0.0,
         },
     }
     # Escribe la época en vivo (fuente barata para la GUI: "¿Cómo va?" + lista).
@@ -101,9 +104,8 @@ def main() -> None:
         "--trainer.callbacks+", json.dumps(early_cb),
         "--trainer.callbacks+", json.dumps(epoca_cb),
     ]
-    print(f"Entrenando «{args.voz}»: early-stop en val_mel "
-          f"(paciencia {args.paciencia} × cada {args.cada} épocas), "
-          f"tope {args.max_epochs}.\n")
+    print(f"Entrenando «{args.voz}»: early-stop si no mejora val_mel en "
+          f"{args.paciencia} épocas (valida cada {args.cada}), tope {args.max_epochs}.\n")
     sys.exit(subprocess.call(cmd))
 
 

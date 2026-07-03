@@ -72,8 +72,8 @@ class TrainPanel(wx.Panel):
         s.Add(row2, 0, wx.EXPAND)
 
         row3 = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_pac = wx.StaticText(self, label="Paciencia:")
-        self.paciencia = wx.SpinCtrl(self, min=1, max=200, initial=12, name="Paciencia")
+        lbl_pac = wx.StaticText(self, label="Paciencia (épocas):")
+        self.paciencia = wx.SpinCtrl(self, min=1, max=100000, initial=200, name="Paciencia en épocas")
         row3.Add(lbl_pac, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
         row3.Add(self.paciencia, 0, wx.ALL, 4)
         lbl_cada = wx.StaticText(self, label="Validar cada:")
