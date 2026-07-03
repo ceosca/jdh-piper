@@ -92,12 +92,24 @@ class TrainPanel(wx.Panel):
             btns.Add(b, 0, wx.ALL, 4)
         s.Add(btns, 0, wx.ALL, 4)
 
-        s.Add(wx.StaticText(self, label="Corridas:"), 0, wx.LEFT | wx.TOP, 6)
-        self.runs_list = wx.ListBox(self, size=(-1, 160), name="Corridas")
-        s.Add(self.runs_list, 1, wx.ALL | wx.EXPAND, 6)
+        # Selector de corrida (para los botones y para elegir qué log ver).
+        row_sel = wx.BoxSizer(wx.HORIZONTAL)
+        sel_lbl = wx.StaticText(self, label="Corrida:")
+        self.run_sel = wx.Choice(self, name="Corrida")
+        row_sel.Add(sel_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row_sel.Add(self.run_sel, 1, wx.ALL, 4)
+        s.Add(row_sel, 0, wx.EXPAND)
+
+        # Log EN VIVO del entrenamiento (una línea por validación).
+        log_lbl = wx.StaticText(self, label="Progreso (en vivo):")
+        s.Add(log_lbl, 0, wx.LEFT | wx.TOP, 6)
+        self.log_view = wx.ListBox(self, size=(-1, 200), name="Progreso del entrenamiento")
+        s.Add(self.log_view, 1, wx.ALL | wx.EXPAND, 6)
         self.howto_btn = wx.Button(self, label="¿&Cómo va?")
         s.Add(self.howto_btn, 0, wx.ALL, 4)
         self.SetSizer(s)
+        self._log_cache = None
+        self.run_sel.Bind(wx.EVT_CHOICE, lambda e: self._refresh_log())
 
         self.ds_btn.Bind(wx.EVT_BUTTON, self._pick_dataset)
         self.start_btn.Bind(wx.EVT_BUTTON, self._on_start)
@@ -141,8 +153,8 @@ class TrainPanel(wx.Panel):
         )
 
     def _selected_run(self) -> runs.RunState | None:
-        i = self.runs_list.GetSelection()
-        if i == wx.NOT_FOUND:
+        i = self.run_sel.GetSelection()
+        if i == wx.NOT_FOUND or not self._runs or i >= len(self._runs):
             return None
         return self._runs[i]
 
@@ -185,7 +197,31 @@ class TrainPanel(wx.Panel):
 
     def refresh_runs(self):
         self._runs = runs.list_runs(TRAIN_ROOT)
-        self.runs_list.Set([self._describe(s) for s in self._runs])
+        sel = self.run_sel.GetSelection()
+        self.run_sel.Set([self._describe(s) for s in self._runs])
+        if self._runs:
+            self.run_sel.SetSelection(sel if 0 <= sel < len(self._runs) else 0)
+        self._refresh_log()
+
+    def _refresh_log(self):
+        """Muestra el progreso.log de la corrida seleccionada (sin robar el foco)."""
+        st = self._selected_run()
+        if not st:
+            if self._log_cache is not None:
+                self._log_cache = None; self.log_view.Set([])
+            return
+        rd = runs.run_dir(TRAIN_ROOT, st.nombre)
+        lineas = runs.leer_progreso(rd)
+        if not lineas:
+            ep = runs.leer_epoca(rd)
+            hint = f"; época {ep}" if ep is not None else ""
+            lineas = [f"(sin progreso registrado todavía{hint})"]
+        if self._log_cache != lineas:
+            self._log_cache = lineas
+            prev = self.log_view.GetSelection()
+            self.log_view.Set(lineas)
+            if 0 <= prev < len(lineas):
+                self.log_view.SetSelection(prev)  # preservar dónde estaba leyendo
 
     def _tick(self, e):
         try:
@@ -208,8 +244,15 @@ class TrainPanel(wx.Panel):
                     continue
             if changed:
                 self.refresh_runs()
+            self._refresh_log()  # el log en vivo se actualiza cada tick
         except Exception:
             pass
+
+    def _decir_estado(self, st, ep, mejor):
+        msg = f"{st.nombre} — {st.estado} — época {ep}"
+        if mejor:
+            msg += f" — mejor: época {mejor[0]} (val_mel {float(mejor[1]):.2f})"
+        self.set_status(msg)
 
     def _on_howto(self, e):
         self.refresh_runs()
@@ -218,22 +261,31 @@ class TrainPanel(wx.Panel):
             self.set_status("No hay corridas."); return
         rd = runs.run_dir(TRAIN_ROOT, st.nombre)
         ep = runs.leer_epoca(rd)
-        if ep is not None:
-            self.set_status(f"{st.nombre} — {st.estado} — época {ep}")
-            return
-        # sin fuente barata todavía (ej. corrida sin epoch.txt): leer la época del
-        # checkpoint más nuevo en un hilo (subproceso, para no cargar torch en la GUI).
-        self.set_status(f"{st.nombre} — {st.estado} — consultando época…")
+        mejor = runs.leer_mejor(rd)
+        if ep is not None and mejor is not None:
+            self._decir_estado(st, ep, mejor); return
+        # falta época o mejor (corrida vieja): leer ambos de los checkpoints (subproceso).
+        self.set_status(f"{st.nombre} — {st.estado} — consultando…")
         threading.Thread(target=self._howto_ckpt,
                          args=(st.nombre, st.estado, str(rd)), daemon=True).start()
 
     def _howto_ckpt(self, nombre, estado, rd):
-        out = ""
+        ep = None; mejor = None
         try:
             r = subprocess.run([PY, str(ROOT / "epoca_ckpt.py"), rd],
-                               capture_output=True, text=True, timeout=90)
-            out = (r.stdout or "").strip().splitlines()[-1] if r.stdout.strip() else ""
+                               capture_output=True, text=True, timeout=120)
+            for ln in (r.stdout or "").splitlines():
+                p = ln.split()
+                if len(p) >= 2 and p[0] == "epoca":
+                    ep = p[1]
+                elif len(p) >= 3 and p[0] == "mejor":
+                    mejor = (p[1], p[2])
         except Exception:
-            out = ""
-        ep_s = f"época {out}" if out.isdigit() else "sin checkpoints todavía"
-        wx.CallAfter(self.set_status, f"{nombre} — {estado} — {ep_s}")
+            pass
+        if ep:
+            msg = f"{nombre} — {estado} — época {ep}"
+            if mejor:
+                msg += f" — mejor: época {mejor[0]} (val_mel {mejor[1]})"
+        else:
+            msg = f"{nombre} — {estado} — sin checkpoints todavía"
+        wx.CallAfter(self.set_status, msg)

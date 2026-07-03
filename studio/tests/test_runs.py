@@ -169,6 +169,22 @@ class TestLeerEpoca(unittest.TestCase):
         rd = run_dir(self.tmp, "v3"); (rd / "ckpts").mkdir(parents=True)
         self.assertIsNone(leer_epoca(rd))
 
+    def test_leer_mejor(self):
+        from studio.runs import leer_mejor, run_dir
+        rd = run_dir(self.tmp, "v4"); rd.mkdir(parents=True)
+        (rd / "mejor.txt").write_text("549 19.4200")
+        self.assertEqual(leer_mejor(rd), (549, 19.42))
+        rd2 = run_dir(self.tmp, "v5"); rd2.mkdir(parents=True)
+        self.assertIsNone(leer_mejor(rd2))
+
+    def test_leer_progreso(self):
+        from studio.runs import leer_progreso, run_dir
+        rd = run_dir(self.tmp, "v6"); rd.mkdir(parents=True)
+        (rd / "progreso.log").write_text("linea 1\nlinea 2\nlinea 3\n")
+        self.assertEqual(leer_progreso(rd), ["linea 1", "linea 2", "linea 3"])
+        self.assertEqual(leer_progreso(rd, max_lineas=2), ["linea 2", "linea 3"])
+        self.assertEqual(leer_progreso(run_dir(self.tmp, "v7")), [])
+
 
 if __name__ == "__main__":
     unittest.main()

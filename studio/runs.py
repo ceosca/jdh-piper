@@ -98,6 +98,29 @@ def leer_epoca(rd: Path) -> int | None:
     return latest_epoch(rd)
 
 
+def leer_mejor(rd: Path):
+    """(época, val_mel) del mejor punto, desde mejor.txt. None si no hay."""
+    try:
+        p = Path(rd) / "mejor.txt"
+        if p.exists():
+            ep, v = p.read_text(encoding="utf-8").split()
+            return int(ep), float(v)
+    except Exception:
+        pass
+    return None
+
+
+def leer_progreso(rd: Path, max_lineas: int = 300) -> list[str]:
+    """Últimas líneas de progreso.log (el log en vivo del entrenamiento). [] si no hay."""
+    try:
+        p = Path(rd) / "progreso.log"
+        if p.exists():
+            return p.read_text(encoding="utf-8").splitlines()[-max_lineas:]
+    except Exception:
+        pass
+    return []
+
+
 def list_runs(root: Path) -> list[RunState]:
     root = Path(root)
     out: list[RunState] = []
