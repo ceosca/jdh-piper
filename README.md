@@ -19,10 +19,12 @@ la GUI se re-engancha al reabrir. Accesible por teclado y lector de pantalla.
 - Binarios de sistema en `PATH`: **ffmpeg** (recorte/silencios), **espeak-ng**
   (lo trae piper-tts). **yt-dlp** opcional.
 - **Checkpoint base** (para fine-tune): descargar de
-  [rhasspy/piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints)
-  el `es_MX/ald/medium` a `base_ckpt/es/es_MX/ald/medium/`. Piper Studio lo
-  **sanea solo** a `base_ckpt/silvio_base_clean.ckpt` la primera vez
-  (`preparar_base.py` / `asegurar_base`).
+  [rhasspy/piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints).
+  Default recomendado **`es_ES/davefx/medium`** (España, espeak `es`) a
+  `base_ckpt/es/es_ES/davefx/medium/`; opcional `es_MX/ald/medium` (México) a
+  `base_ckpt/es/es_MX/ald/medium/`. Se eligen con el selector **Base** en Entrenar.
+  Piper Studio los **sanea solos** (`preparar_base.py` / `asegurar_base`) a
+  `base_ckpt/davefx_base_clean.ckpt` / `silvio_base_clean.ckpt`.
 - Parche necesario del entrenador: `vits/monotonic_align/__init__.py` reemplazado
   por una versión **numba** (sin MSVC). Ver notas en `docs/`.
 
