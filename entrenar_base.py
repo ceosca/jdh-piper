@@ -90,7 +90,15 @@ def main() -> None:
                                    filename=nombre + "-{epoch}"),
                    EscritorEpoca(str(ROOT / "training" / nombre / "epoch.txt"))],
     )
-    trainer.fit(model, data, ckpt_path=resume_ckpt)
+    estado = "fallo"
+    try:
+        trainer.fit(model, data, ckpt_path=resume_ckpt)
+        estado = "terminado"
+    finally:
+        try:  # marca de salida para la GUI (terminado vs fallo)
+            (ROOT / "training" / nombre / "estado_final.txt").write_text(estado, encoding="utf-8")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

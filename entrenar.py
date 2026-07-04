@@ -106,7 +106,13 @@ def main() -> None:
     ]
     print(f"Entrenando «{args.voz}»: early-stop si no mejora val_mel en "
           f"{args.paciencia} épocas (valida cada {args.cada}), tope {args.max_epochs}.\n")
-    sys.exit(subprocess.call(cmd))
+    rc = subprocess.call(cmd)
+    try:  # marca de salida para que la GUI distinga terminado vs fallo
+        (ROOT / "training" / args.voz / "estado_final.txt").write_text(
+            "terminado" if rc == 0 else "fallo", encoding="utf-8")
+    except Exception:
+        pass
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

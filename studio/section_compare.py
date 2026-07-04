@@ -4,6 +4,8 @@ import subprocess, threading
 from pathlib import Path
 import wx
 
+from studio import runs
+
 ROOT = Path(__file__).resolve().parent.parent
 PY = str(ROOT / "env" / "python.exe")
 
@@ -40,9 +42,11 @@ class ComparePanel(wx.Panel):
 
     def _on_gen(self, e):
         voz = self.voz.GetValue().strip()
+        if not voz:
+            self.status.SetLabel("Escribí el nombre de la voz."); return
         ck = ROOT / "training" / voz / "ckpts"
-        cfg = ROOT / "datasets" / voz / "config.json"
-        if not ck.is_dir() or not cfg.exists():
+        cfg = runs.config_de_voz(ROOT, voz)  # del dataset del run.json (voz puede != carpeta)
+        if not ck.is_dir() or cfg is None:
             self.status.SetLabel("No encuentro ckpts o config.json de esa voz."); return
         self.status.SetLabel("Generando WAVs…"); self.nvda.speak("Generando WAVs", True)
         argv = [PY, str(ROOT / "comparar_checkpoints.py"),
@@ -51,12 +55,16 @@ class ComparePanel(wx.Panel):
         threading.Thread(target=self._worker, args=(argv, voz), daemon=True).start()
 
     def _worker(self, argv, voz):
-        subprocess.run(argv, cwd=str(ROOT), capture_output=True, text=True)
-        wx.CallAfter(self._done, voz)
+        r = subprocess.run(argv, cwd=str(ROOT), capture_output=True, text=True)
+        wx.CallAfter(self._done, voz, r.returncode)
 
-    def _done(self, voz):
-        self.status.SetLabel(f"Listo. WAVs en {self._out(voz)}")
-        self.nvda.speak("WAVs listos para comparar", True)
+    def _done(self, voz, code=0):
+        if code == 0:
+            self.status.SetLabel(f"Listo. WAVs en {self._out(voz)}")
+            self.nvda.speak("WAVs listos para comparar", True)
+        else:
+            self.status.SetLabel("Error generando los WAVs (revisá studio.log).")
+            self.nvda.speak("Error generando los WAVs", True)
 
     def _on_open(self, e):
         import os

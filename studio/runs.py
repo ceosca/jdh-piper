@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
@@ -29,10 +29,6 @@ class RunState:
 
 def run_dir(root: Path, nombre: str) -> Path:
     return Path(root) / nombre
-
-
-def _run_json(root: Path, nombre: str) -> Path:
-    return run_dir(root, nombre) / "run.json"
 
 
 def save_run(root: Path, st: RunState) -> None:
@@ -121,6 +117,24 @@ def leer_progreso(rd: Path, max_lineas: int = 300) -> list[str]:
     return []
 
 
+def config_de_voz(root: Path, voz: str) -> Path | None:
+    """config.json de la voz: el del dataset de su run.json (voz puede != carpeta);
+    fallback a datasets/<voz>/config.json. None si no se encuentra."""
+    root = Path(root)
+    rj = root / "training" / voz / "run.json"
+    try:
+        if rj.exists():
+            ds = load_run(rj).dataset
+            if ds:
+                c = Path(ds) / "config.json"
+                if c.exists():
+                    return c
+    except Exception:
+        pass
+    c = root / "datasets" / voz / "config.json"
+    return c if c.exists() else None
+
+
 def list_runs(root: Path) -> list[RunState]:
     root = Path(root)
     out: list[RunState] = []
@@ -131,10 +145,15 @@ def list_runs(root: Path) -> list[RunState]:
             st = load_run(rj)
         except Exception:
             continue
-        # refrescar estado según liveness real del proceso
+        # refrescar estado según liveness real del proceso: solo si estaba
+        # "entrenando" y el proceso murió (una pausa/detención explícita se respeta).
         if st.estado == "entrenando" and not pid_alive(st.pid):
-            # se murió sin marcar; asumimos terminado (o pausa por kill)
-            st.estado = "terminado"
+            final = run_dir(root, st.nombre) / "estado_final.txt"  # "terminado"|"fallo"
+            try:
+                st.estado = (final.read_text(encoding="utf-8").strip() or "terminado"
+                             if final.exists() else "terminado")
+            except Exception:
+                st.estado = "terminado"
         out.append(st)
     return out
 
@@ -212,6 +231,7 @@ def _spawn_detached(argv: list[str], cwd: Path, log_path: Path) -> int:
 def launch(root_runs: Path, root_proj: Path, st: RunState, py: str) -> RunState:
     rd = run_dir(root_runs, st.nombre)
     (rd / "ckpts").mkdir(parents=True, exist_ok=True)
+    (rd / "estado_final.txt").unlink(missing_ok=True)  # marca fresca para esta corrida
     argv = build_train_argv(py, root_proj, st)
     st.pid = _spawn_detached(argv, Path(root_proj), rd / "train.log")
     st.started_at = _dt.datetime.now().isoformat(timespec="seconds")

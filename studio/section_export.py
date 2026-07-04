@@ -5,9 +5,12 @@ import shutil, subprocess, threading
 from pathlib import Path
 import wx
 
+from studio import runs
+
 ROOT = Path(__file__).resolve().parent.parent
 PY = str(ROOT / "env" / "python.exe")
-PLAYER_VOICES = Path(r"C:\ia\modelos pc\piper\voces")
+# Carpeta de voces del reproductor CPU. Configurable por env para portabilidad.
+PLAYER_VOICES = Path(os.environ.get("PIPER_PLAYER_VOICES", r"C:\ia\modelos pc\piper\voces"))
 # Carpeta de voces del add-on Piper/Sonata para NVDA.
 NVDA_VOICES = Path(os.environ.get("APPDATA", "")) / "nvda" / "piper" / "voices" / "v1.0"
 # Códigos de dialecto para el nombre de la voz en NVDA (solo etiqueta; la
@@ -81,13 +84,15 @@ class ExportPanel(wx.Panel):
 
     def _exported(self, voz, code):
         if code == 0:
-            cfg = ROOT / "datasets" / voz / "config.json"
+            cfg = runs.config_de_voz(ROOT, voz)  # del dataset del run.json (voz puede != carpeta)
             try:
+                if cfg is None:
+                    raise FileNotFoundError
                 shutil.copyfile(cfg, self._onnx_path(voz).with_suffix(".onnx.json"))
                 self.status.SetLabel("Exportado. Ya podés instalar.")
                 self.nvda.speak("Exportado", True)
             except (FileNotFoundError, OSError):
-                self.status.SetLabel("Exportado, pero falta config.json del dataset.")
+                self.status.SetLabel("Exportado, pero no encuentro el config.json del dataset.")
                 self.nvda.speak("Exportado, pero falta el config del dataset", True)
         else:
             self.status.SetLabel("Error exportando (ver studio.log).")
@@ -95,18 +100,25 @@ class ExportPanel(wx.Panel):
 
     def _on_install(self, e):
         voz = self.voz.GetValue().strip()
+        if not voz:
+            self.status.SetLabel("Escribí el nombre de la voz."); return
         onnx = self._onnx_path(voz)
-        if not onnx.exists():
-            self.status.SetLabel("Primero exportá."); return
+        if not onnx.exists() or not onnx.with_suffix(".onnx.json").exists():
+            self.status.SetLabel("Primero exportá a ONNX (falta el .onnx o su .json)."); return
         dst = PLAYER_VOICES / voz
-        dst.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(onnx, dst / f"{voz}.onnx")
-        shutil.copyfile(onnx.with_suffix(".onnx.json"), dst / f"{voz}.onnx.json")
+        try:
+            dst.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(onnx, dst / f"{voz}.onnx")
+            shutil.copyfile(onnx.with_suffix(".onnx.json"), dst / f"{voz}.onnx.json")
+        except OSError as ex:
+            self.status.SetLabel(f"No se pudo instalar en el reproductor: {ex}"); return
         self.status.SetLabel(f"Instalada en el reproductor: {dst}")
         self.nvda.speak("Voz instalada en el reproductor", True)
 
     def _on_install_nvda(self, e):
         voz = self.voz.GetValue().strip()
+        if not voz:
+            self.status.SetLabel("Escribí el nombre de la voz."); return
         onnx = self._onnx_path(voz)
         if not onnx.exists() or not onnx.with_suffix(".onnx.json").exists():
             self.status.SetLabel("Primero exportá a ONNX."); return

@@ -185,6 +185,21 @@ class TestLeerEpoca(unittest.TestCase):
         self.assertEqual(leer_progreso(rd, max_lineas=2), ["linea 2", "linea 3"])
         self.assertEqual(leer_progreso(run_dir(self.tmp, "v7")), [])
 
+    def test_config_de_voz_usa_dataset_del_run(self):
+        # voz "mario" con dataset "mario-castanieda" (nombre != carpeta)
+        from studio.runs import config_de_voz, save_run, RunState
+        ds = self.tmp / "datasets" / "mario-castanieda"; ds.mkdir(parents=True)
+        (ds / "config.json").write_text("{}")
+        save_run(self.tmp / "training", RunState(nombre="mario", dataset=str(ds)))
+        self.assertEqual(config_de_voz(self.tmp, "mario"), ds / "config.json")
+
+    def test_config_de_voz_fallback_y_none(self):
+        from studio.runs import config_de_voz
+        d = self.tmp / "datasets" / "pedro"; d.mkdir(parents=True)
+        (d / "config.json").write_text("{}")
+        self.assertEqual(config_de_voz(self.tmp, "pedro"), d / "config.json")
+        self.assertIsNone(config_de_voz(self.tmp, "noexiste"))
+
 
 if __name__ == "__main__":
     unittest.main()
