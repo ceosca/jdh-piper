@@ -51,10 +51,20 @@ parches aplicados.
 
 ## Checkpoint base (para fine-tune)
 
-Descargá de [rhasspy/piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints)
-el **`es/es_MX/ald/medium/epoch=9999-step=1753600.ckpt`** y ponelo en
-`base_ckpt/es/es_MX/ald/medium/`. Piper Studio lo **sanea solo** la primera vez
-(`preparar_base.py` / auto). También podés recibirlo en el zip.
+Hay dos bases posibles (ambas «medium», 22050 Hz). En la pestaña **Entrenar** se
+elige con el selector **Base**:
+
+- **España (davefx)** — *recomendado y default*. Fonemizado con espeak `es` (trae
+  la θ de c/z de fábrica, alineado con nuestra fonemización).
+  Descargá `es/es_ES/davefx/medium/epoch=5629-step=1605020.ckpt` a
+  `base_ckpt/es/es_ES/davefx/medium/`.
+- **México (ald)** — probado (silvio/mario/pedro). Fonemizado con `es-419` (seseo).
+  Descargá `es/es_MX/ald/medium/epoch=9999-step=1753600.ckpt` a
+  `base_ckpt/es/es_MX/ald/medium/`.
+
+Los dos salen de [rhasspy/piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints).
+Con **davefx** alcanza para arrancar; el ald es opcional. Piper Studio los **sanea
+solos** la primera vez (`preparar_base.py` / auto). También podés recibirlos en el zip.
 
 ## Binarios de sistema (en el PATH)
 

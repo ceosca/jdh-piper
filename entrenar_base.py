@@ -4,7 +4,7 @@
 Construye un VitsModel multi-hablante, le inyecta los ~784 pesos del mono
 (fusionar_pesos deja random solo emb_g + capas cond), y entrena de cero (fit).
 Uso:
-  env\\python.exe entrenar_base.py --dataset datasets/base_latino --base-mono base_ckpt/silvio_base_clean.ckpt --num-speakers 12
+  env\\python.exe entrenar_base.py --dataset datasets/base_latino --base-mono base_ckpt/davefx_base_clean.ckpt --num-speakers 12
 """
 import argparse
 import inspect

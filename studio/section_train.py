@@ -12,7 +12,12 @@ from studio import runs
 ROOT = Path(__file__).resolve().parent.parent
 PY = str(ROOT / "env" / "python.exe")
 TRAIN_ROOT = ROOT / "training"
-DEFAULT_BASE = ROOT / "base_ckpt" / "silvio_base_clean.ckpt"
+# Bases disponibles para fine-tune / cirugía multi-hablante (etiqueta, ckpt saneado).
+# davefx (España, espeak `es`) primero = default recomendado; ald (México) probado.
+BASES = [
+    ("España (davefx) — recomendado", ROOT / "base_ckpt" / "davefx_base_clean.ckpt"),
+    ("México (ald) — probado", ROOT / "base_ckpt" / "silvio_base_clean.ckpt"),
+]
 
 
 class TrainPanel(wx.Panel):
@@ -60,6 +65,15 @@ class TrainPanel(wx.Panel):
         row_modo.Add(self.num_spk, 0, wx.ALL, 4)
         s.Add(row_modo, 0, wx.EXPAND)
         self.modo.Bind(wx.EVT_CHOICE, self._toggle_modo)
+
+        row_base = wx.BoxSizer(wx.HORIZONTAL)
+        base_lbl = wx.StaticText(self, label="Base:")
+        self.base_sel = wx.Choice(self, choices=[b[0] for b in BASES],
+                                  name="Checkpoint base")
+        self.base_sel.SetSelection(0)
+        row_base.Add(base_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        row_base.Add(self.base_sel, 1, wx.ALL, 4)
+        s.Add(row_base, 0, wx.EXPAND)
 
         row2 = wx.BoxSizer(wx.HORIZONTAL)
         lbl_ep = wx.StaticText(self, label="Épocas:")
@@ -144,7 +158,7 @@ class TrainPanel(wx.Panel):
             modo="base" if es_base else "finetune",
             num_speakers=self.num_spk.GetValue(),
             dataset=self.dataset or str(ROOT / "datasets" / (self.name_ctrl.GetValue().strip() or "mivoz")),
-            base_ckpt=str(DEFAULT_BASE),
+            base_ckpt=str(BASES[max(0, self.base_sel.GetSelection())][1]),
             max_epochs=self.epochs.GetValue(),
             auto_stop=self.auto.GetValue(),
             paciencia=self.paciencia.GetValue(),

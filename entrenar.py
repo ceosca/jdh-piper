@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PY = sys.executable
-DEFAULT_BASE = ROOT / "base_ckpt" / "silvio_base_clean.ckpt"  # base es_MX ya saneado (genérico)
+DEFAULT_BASE = ROOT / "base_ckpt" / "davefx_base_clean.ckpt"  # base es_ES/davefx (España, espeak es)
 
 
 def main() -> None:
