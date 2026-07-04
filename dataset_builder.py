@@ -15,6 +15,7 @@ from __future__ import annotations
 import glob
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -181,8 +182,19 @@ def build_dataset(inputs, out_dir, model_size="large-v3", language="es",
     with open(meta, "w", encoding="utf-8") as f:
         for clip_id, text in rows:
             f.write(f"{clip_id}|{text}\n")
+    total, unicos = contar_duplicados([t for _, t in rows])
+    if total > unicos:
+        say(f"OJO: {total - unicos} de {total} clips están DUPLICADOS (mismo texto). "
+            "Los duplicados pueden filtrar a validación y engañar el val_mel; "
+            "conviene usar audio ÚNICO, no copiado.")
     say(f"LISTO: {len(rows)} frases -> {meta}")
     return str(out)
+
+
+def contar_duplicados(textos) -> tuple[int, int]:
+    """Devuelve (total, únicos) de una lista de textos. total>únicos ⇒ hay duplicados."""
+    textos = [t.strip() for t in textos]
+    return len(textos), len(set(textos))
 
 
 def fila_multi(wav_id: str, speaker: str, text: str) -> str:
@@ -191,9 +203,16 @@ def fila_multi(wav_id: str, speaker: str, text: str) -> str:
 
 
 def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
-                               espeak="es", progress=None, stop_flag=None):
+                               progress=None, stop_flag=None):
     """speakers: {nombre_hablante: [audios/carpetas]}. Arma wavs/ + metadata.csv
-    (id|speaker|text). Devuelve la cantidad de hablantes."""
+    (id|speaker|text). La fonemización la fija el entrenamiento, no el armado.
+    Devuelve la cantidad de hablantes que quedaron con clips."""
+    import csv as _csv
+
+    def say(m):
+        if progress:
+            progress(m)
+
     out = Path(out_dir)
     wavs = out / "wavs"
     wavs.mkdir(parents=True, exist_ok=True)
@@ -201,21 +220,27 @@ def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
     for speaker, entradas in speakers.items():
         if stop_flag is not None and stop_flag.is_set():
             break
-        if progress:
-            progress(f"Procesando hablante: {speaker}")
-        # build_dataset arma clips+texto en una carpeta temporal por hablante
-        tmp = out / f"_tmp_{speaker}"
+        say(f"Procesando hablante: {speaker}")
+        tmp = out / f"_tmp_{speaker}"          # carpeta temporal por hablante
         build_dataset(entradas, str(tmp), model_size=model_size,
                       progress=progress, stop_flag=stop_flag)
-        # mover wavs con prefijo de hablante y volcar filas con la columna speaker
-        import csv as _csv
-        with open(tmp / "metadata.csv", "r", encoding="utf-8") as f:
-            for row in _csv.reader(f, delimiter="|"):
-                if len(row) < 2:
-                    continue
-                wid, text = row[0], row[-1]
-                new_id = f"{speaker}_{wid}"
-                (tmp / "wavs" / f"{wid}.wav").replace(wavs / f"{new_id}.wav")
-                filas.append(fila_multi(new_id, speaker, text))
+        meta = tmp / "metadata.csv"
+        if meta.exists():
+            with open(meta, "r", encoding="utf-8") as f:
+                for row in _csv.reader(f, delimiter="|"):
+                    if len(row) < 2:
+                        continue
+                    wid, text = row[0], row[-1]
+                    new_id = f"{speaker}_{wid}"
+                    src = tmp / "wavs" / f"{wid}.wav"
+                    if src.exists():
+                        src.replace(wavs / f"{new_id}.wav")
+                        filas.append(fila_multi(new_id, speaker, text))
+        shutil.rmtree(tmp, ignore_errors=True)  # limpiar la temporal
     (out / "metadata.csv").write_text("\n".join(filas) + "\n", encoding="utf-8")
-    return len(speakers)
+    total, unicos = contar_duplicados([f.split("|", 2)[-1] for f in filas])
+    if total > unicos:
+        say(f"OJO: {total - unicos} de {total} clips duplicados (mismo texto) — "
+            "conviene audio único.")
+    n_hablantes = len({f.split("|")[1] for f in filas})  # los que quedaron con clips
+    return n_hablantes

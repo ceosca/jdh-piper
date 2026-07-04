@@ -45,8 +45,9 @@ Mecánica:
 - **Reanudar** = relanzar desde `last.ckpt` (o el que se elija), continuando época.
 - **Detener** = terminar y marcar `terminado`.
 
-La época "en vivo" se estima del último checkpoint + parseo del `train.log`
-(la barra tqdm no se captura bien; los checkpoints son la señal fiable).
+La época "en vivo" la escribe el propio entrenamiento en `epoch.txt` cada época
+(un callback), junto con `progreso.log` y `mejor.txt`; la GUI los lee barato. (El
+`train.log` queda vacío al correr desprendido, por eso NO se usa para la época.)
 
 ## La app (una sola ventana, secciones)
 
@@ -88,8 +89,10 @@ Controles:
   `num_speakers > 1`).
 - **Acentos**: fonemización unificada **`es`** (España — preserva c/z y ll/y; cada dialecto lo aprende su embedding); chileno/
   argentino/cubano/etc. conviven, y los `speaker embeddings` absorben la variación.
-- **Bootstrap**: el base arranca desde un checkpoint de **un solo hablante** vía
-  `--resume_from_single_speaker_checkpoint` (mucho más rápido que desde cero).
+- **Bootstrap**: piper1-gpl 1.4.2 NO tiene `--resume_from_single_speaker_checkpoint`.
+  El base arranca por **CIRUGÍA DE PESOS**: se copian ~784 pesos acústicos de un
+  checkpoint de un hablante a un modelo multi-hablante nuevo; solo `emb_g` + las
+  capas `cond` arrancan de cero (`studio/base_multi.py` + `entrenar_base.py`).
 - Requiere **extender el armador de dataset** (`dataset_builder.py`) al modo
   multi-hablante (emitir columna de hablante, recorrer varias carpetas).
 
