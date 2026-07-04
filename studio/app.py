@@ -15,6 +15,7 @@ from studio.nvda import NVDAController  # noqa: E402
 from studio.section_train import TrainPanel  # noqa: E402
 from studio.section_compare import ComparePanel  # noqa: E402
 from studio.section_export import ExportPanel  # noqa: E402
+from studio.section_player import PlayerPanel  # noqa: E402
 
 
 class StudioFrame(wx.Frame):
@@ -26,6 +27,7 @@ class StudioFrame(wx.Frame):
         self.nb.AddPage(TrainPanel(self.nb, self.nvda), "Entrenar")
         self.nb.AddPage(ComparePanel(self.nb, self.nvda), "Comparar")
         self.nb.AddPage(ExportPanel(self.nb, self.nvda), "Exportar")
+        self.nb.AddPage(PlayerPanel(self.nb, self.nvda), "Reproductor")
         self.Centre(); self.Show()
         self.nvda.speak("Piper Studio abierto", True)
 
