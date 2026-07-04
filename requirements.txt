@@ -1,0 +1,27 @@
+# Piper Studio — dependencias (Python 3.11, Windows, GPU NVIDIA)
+#
+# TORCH con CUDA 12.8 — instalar con el índice de PyTorch (NO el pip normal):
+#   pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0
+torchaudio==2.8.0
+
+# Entrenamiento (Lightning + Piper)
+lightning==2.6.5
+pytorch-lightning==2.6.5
+torchmetrics==1.9.0
+piper-tts==1.4.2
+numba==0.66.0              # para el monotonic_align sin MSVC (ver aplicar_parches.py)
+
+# Dataset (whisper + audio)
+faster-whisper==1.2.1
+ctranslate2==4.8.0
+
+# Inferencia / reproductor
+onnxruntime==1.27.0        # (o onnxruntime-gpu para GPU en el reproductor)
+soundfile==0.14.0
+sounddevice
+
+# GUI + utilidades
+wxPython==4.2.5
+num2words==0.5.14
+numpy==2.4.6
