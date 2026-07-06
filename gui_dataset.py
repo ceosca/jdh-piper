@@ -28,6 +28,18 @@ from dataset_builder import build_dataset, build_multispeaker_dataset  # noqa: E
 DATASETS_DIR = ROOT / "datasets"
 
 
+def _app_is_foreground() -> bool:
+    """True solo si la ventana en primer plano es de ESTE proceso. Sin esto, el
+    lector sigue hablando (e interrumpiendo otras apps) aunque cambies de ventana."""
+    try:
+        u = ctypes.windll.user32
+        pid = ctypes.c_ulong()
+        u.GetWindowThreadProcessId(u.GetForegroundWindow(), ctypes.byref(pid))
+        return pid.value == ctypes.windll.kernel32.GetCurrentProcessId()
+    except Exception:
+        return True
+
+
 class NVDAController:
     def __init__(self, base_dir: Path = ROOT):
         self.dll = None
@@ -42,6 +54,8 @@ class NVDAController:
 
     def speak(self, text, interrupt=True):
         if not self.ready or self.dll is None:
+            return
+        if not _app_is_foreground():   # no hablar (ni interrumpir) si no tenés el foco
             return
         try:
             if interrupt and hasattr(self.dll, "nvdaController_cancelSpeech"):

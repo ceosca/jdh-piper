@@ -1,8 +1,8 @@
 import unittest
-from dataset_builder import contar_duplicados, fila_multi
+from dataset_builder import fila_multi, plan_clips
 
 
-class TestDatasetMulti(unittest.TestCase):
+class TestFilaMulti(unittest.TestCase):
     def test_fila_multi_formato(self):
         self.assertEqual(fila_multi("clip_0", "silvio", "hola mundo"),
                          "clip_0|silvio|hola mundo")
@@ -11,10 +11,21 @@ class TestDatasetMulti(unittest.TestCase):
         # el texto no debe romper el CSV con '|'
         self.assertEqual(fila_multi("c1", "ana", "uno | dos"), "c1|ana|uno  dos")
 
-    def test_contar_duplicados(self):
-        self.assertEqual(contar_duplicados(["a", "b", "a", "c"]), (4, 3))  # 1 dup
-        self.assertEqual(contar_duplicados(["x", "y"]), (2, 2))            # sin dup
-        self.assertEqual(contar_duplicados([" a ", "a"]), (2, 1))          # strip
+
+class TestPlanClips(unittest.TestCase):
+    def test_archivo_corto_se_conserva_entero(self):
+        # un audio suelto de 10s (<= max_clip) queda como UN clip, sin re-segmentar
+        self.assertEqual(plan_clips(10.0, [], max_clip=15.0), [(0.0, 10.0)])
+
+    def test_clip_muy_corto_no_se_descarta(self):
+        # un clip de 0.8s (antes se tiraba por < 1s) ahora se conserva entero
+        self.assertEqual(plan_clips(0.8, [], max_clip=15.0), [(0.0, 0.8)])
+
+    def test_archivo_largo_si_se_segmenta(self):
+        # un audio largo (> max_clip) SÍ se parte por silencios (comportamiento previo)
+        segs = plan_clips(40.0, [(15.0, 16.0), (30.0, 31.0)], max_clip=15.0)
+        self.assertGreater(len(segs), 1)
+        self.assertNotEqual(segs, [(0.0, 40.0)])  # no devuelve el archivo entero
 
 
 if __name__ == "__main__":

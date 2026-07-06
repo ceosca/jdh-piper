@@ -47,16 +47,31 @@ def _ffmpeg() -> str:
     return os.environ.get("FFMPEG_PATH") or "ffmpeg"
 
 
+def _duration_via_ffmpeg(path: str) -> float:
+    """Duración leída del stderr de ffmpeg (fallback si no hay ffprobe)."""
+    proc = subprocess.run([_ffmpeg(), "-i", path], capture_output=True, text=True)
+    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", proc.stderr)
+    if m:
+        h, mn, s = m.groups()
+        return int(h) * 3600 + int(mn) * 60 + float(s)
+    return 0.0
+
+
 def _ffprobe_duration(path: str) -> float:
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", path],
-        capture_output=True, text=True,
-    )
+    """Duración en segundos. Usa ffprobe; si no está o falla, cae a ffmpeg.
+    Devolver 0 acá tiraba archivos enteros (sin duración no hay segmentos)."""
     try:
-        return float(out.stdout.strip())
-    except ValueError:
-        return 0.0
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True,
+        )
+        d = float(out.stdout.strip())
+        if d > 0:
+            return d
+    except (ValueError, FileNotFoundError, OSError):
+        pass
+    return _duration_via_ffmpeg(path)
 
 
 def detect_silences(path: str, noise_db: int = -30, min_sil: float = 0.4):
@@ -107,6 +122,18 @@ def speech_segments(total_dur, silences, min_clip=2.0, max_clip=15.0, pad=0.15):
     return segs
 
 
+def plan_clips(dur, silences, min_clip=2.0, max_clip=15.0, pad=0.15):
+    """Segmentos (inicio, fin) a extraer de UN archivo.
+
+    Si el archivo ya es corto (`dur` <= `max_clip`) se conserva **entero** como un
+    solo clip: no se re-segmenta ni se descarta. Así los datasets de audios
+    SUELTOS (ya cortados) no pierden clips por silencios internos o por durar poco.
+    Si es largo, se parte por silencios (comportamiento de siempre)."""
+    if dur and dur <= max_clip:
+        return [(0.0, float(dur))]
+    return speech_segments(dur, silences, min_clip, max_clip, pad)
+
+
 def extract_clip(src: str, start: float, end: float, out_wav: str):
     """Extrae [start,end] a WAV 22050 mono."""
     subprocess.run(
@@ -155,11 +182,13 @@ def build_dataset(inputs, out_dir, model_size="large-v3", language="es",
         raise RuntimeError("No se encontraron audios en la entrada.")
 
     for si, src in enumerate(sources, 1):
-        say(f"[{si}/{len(sources)}] Analizando silencios: {Path(src).name}")
+        say(f"[{si}/{len(sources)}] Procesando: {Path(src).name}")
         dur = _ffprobe_duration(src)
-        sils = detect_silences(src, noise_db, min_sil)
-        segs = speech_segments(dur, sils, min_clip, max_clip)
-        say(f"  {len(segs)} frases detectadas.")
+        # Solo re-segmentar por silencios si el archivo es LARGO. Un audio ya corto
+        # (suelto) se conserva entero — no se parte ni se descarta.
+        sils = detect_silences(src, noise_db, min_sil) if dur > max_clip else []
+        segs = plan_clips(dur, sils, min_clip, max_clip)
+        say(f"  {len(segs)} frase(s).")
         for (a, b) in segs:
             if stop_flag is not None and stop_flag.is_set():
                 say("Cancelado.")
@@ -182,19 +211,8 @@ def build_dataset(inputs, out_dir, model_size="large-v3", language="es",
     with open(meta, "w", encoding="utf-8") as f:
         for clip_id, text in rows:
             f.write(f"{clip_id}|{text}\n")
-    total, unicos = contar_duplicados([t for _, t in rows])
-    if total > unicos:
-        say(f"OJO: {total - unicos} de {total} clips están DUPLICADOS (mismo texto). "
-            "Los duplicados pueden filtrar a validación y engañar el val_mel; "
-            "conviene usar audio ÚNICO, no copiado.")
     say(f"LISTO: {len(rows)} frases -> {meta}")
     return str(out)
-
-
-def contar_duplicados(textos) -> tuple[int, int]:
-    """Devuelve (total, únicos) de una lista de textos. total>únicos ⇒ hay duplicados."""
-    textos = [t.strip() for t in textos]
-    return len(textos), len(set(textos))
 
 
 def fila_multi(wav_id: str, speaker: str, text: str) -> str:
@@ -238,9 +256,5 @@ def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
                         filas.append(fila_multi(new_id, speaker, text))
         shutil.rmtree(tmp, ignore_errors=True)  # limpiar la temporal
     (out / "metadata.csv").write_text("\n".join(filas) + "\n", encoding="utf-8")
-    total, unicos = contar_duplicados([f.split("|", 2)[-1] for f in filas])
-    if total > unicos:
-        say(f"OJO: {total - unicos} de {total} clips duplicados (mismo texto) — "
-            "conviene audio único.")
     n_hablantes = len({f.split("|")[1] for f in filas})  # los que quedaron con clips
     return n_hablantes
