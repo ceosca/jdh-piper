@@ -8,6 +8,12 @@ class TestPuros(unittest.TestCase):
         m = {"a": [5], "b": [6, 99]}  # toma SOLO el primer id
         self.assertEqual(tokens_txt(m), "a 5\nb 6\n")
 
+    def test_tokens_txt_saltea_newline_y_ids_vacios(self):
+        # como el patcher de sherpa: saltear el símbolo "\n" y los ids vacíos
+        # (ids vacíos harían crashear ids[0]). Parity con el juego de Franco.
+        m = {"a": [5], "\n": [7], "b": [], "c": [8]}
+        self.assertEqual(tokens_txt(m), "a 5\nc 8\n")
+
     def test_meta_data_toma_voice_del_config(self):
         cfg = {"espeak": {"voice": "es"}, "language": {"name_english": "Spanish"},
                "num_speakers": 1, "audio": {"sample_rate": 22050}}

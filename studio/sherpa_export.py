@@ -12,8 +12,12 @@ from pathlib import Path
 
 
 def tokens_txt(phoneme_id_map: dict) -> str:
-    """Contenido de tokens.txt: por símbolo, su PRIMER id -> línea '<símbolo> <id>'."""
-    lineas = [f"{s} {ids[0]}" for s, ids in phoneme_id_map.items()]
+    """Contenido de tokens.txt: por símbolo, su PRIMER id -> línea '<símbolo> <id>'.
+
+    Saltea el símbolo '\\n' (rompería una línea) y los símbolos con ids vacíos
+    (harían crashear ids[0]) — igual que el patcher de sherpa que usa el juego."""
+    lineas = [f"{s} {ids[0]}" for s, ids in phoneme_id_map.items()
+              if s != "\n" and ids]
     return "\n".join(lineas) + "\n"
 
 
