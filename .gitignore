@@ -21,3 +21,6 @@ checkpoints/
 
 # Salidas del reproductor
 salidas/
+
+# Paquetes para sherpa-onnx
+sherpa/

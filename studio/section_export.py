@@ -5,7 +5,7 @@ import shutil, subprocess, threading
 from pathlib import Path
 import wx
 
-from studio import runs
+from studio import runs, sherpa_export
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = str(ROOT / "env" / "python.exe")
@@ -53,11 +53,14 @@ class ExportPanel(wx.Panel):
         s.Add(self.exp_btn, 0, wx.ALL, 4)
         s.Add(self.inst_btn, 0, wx.ALL, 4)
         s.Add(self.nvda_btn, 0, wx.ALL, 4)
+        self.sherpa_btn = wx.Button(self, label="Exportar para &sherpa-onnx")
+        s.Add(self.sherpa_btn, 0, wx.ALL, 4)
         self.SetSizer(s)
         self.ckpt_btn.Bind(wx.EVT_BUTTON, self._pick)
         self.exp_btn.Bind(wx.EVT_BUTTON, self._on_export)
         self.inst_btn.Bind(wx.EVT_BUTTON, self._on_install)
         self.nvda_btn.Bind(wx.EVT_BUTTON, self._on_install_nvda)
+        self.sherpa_btn.Bind(wx.EVT_BUTTON, self._on_sherpa)
 
     def _pick(self, e):
         voz = self.voz.GetValue().strip()
@@ -135,3 +138,35 @@ class ExportPanel(wx.Panel):
             self.status.SetLabel(f"No se pudo instalar para NVDA: {ex}"); return
         self.status.SetLabel(f"Instalada para NVDA como «{vid}». Reiniciá NVDA y elegí la voz.")
         self.nvda.speak(f"Voz {voz} instalada para NVDA. Reiniciá NVDA para usarla.", True)
+
+    def _on_sherpa(self, e):
+        voz = self.voz.GetValue().strip()
+        if not voz:
+            self.status.SetLabel("Escribí el nombre de la voz."); return
+        onnx = self._onnx_path(voz)
+        if not onnx.exists() or not onnx.with_suffix(".onnx.json").exists():
+            self.status.SetLabel("Primero exportá a ONNX."); return
+        espeak = sherpa_export.espeak_data_dir(ROOT / "env")
+        if espeak is None:
+            self.status.SetLabel("No encuentro espeak-ng-data en el env."); return
+        out = ROOT / "sherpa" / voz
+        self.status.SetLabel("Empaquetando para sherpa-onnx…")
+        self.nvda.speak("Empaquetando para sherpa onnx", True)
+        threading.Thread(target=self._sherpa_worker,
+                         args=(onnx, onnx.with_suffix(".onnx.json"), out, espeak),
+                         daemon=True).start()
+
+    def _sherpa_worker(self, onnx, cfg, out, espeak):
+        try:
+            sherpa_export.empaquetar(onnx, cfg, out, espeak)
+            wx.CallAfter(self._sherpa_done, out, None)
+        except Exception as ex:
+            wx.CallAfter(self._sherpa_done, out, ex)
+
+    def _sherpa_done(self, out, err):
+        if err:
+            self.status.SetLabel(f"Error empaquetando: {err}")
+            self.nvda.speak("Error empaquetando para sherpa", True)
+        else:
+            self.status.SetLabel(f"Listo para sherpa-onnx en {out}")
+            self.nvda.speak("Voz empaquetada para sherpa onnx", True)
