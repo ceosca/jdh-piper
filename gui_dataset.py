@@ -27,6 +27,15 @@ from dataset_builder import build_dataset, build_multispeaker_dataset  # noqa: E
 
 DATASETS_DIR = ROOT / "datasets"
 
+# Presets de tamaño de clip (etiqueta, perillas de segmentación). "Muy chiquitos"
+# primero = default: más clips y más cortos, cortando en más silencios.
+CLIP_PRESETS = [
+    ("Muy chiquitos (2 a 4 s)", dict(min_sil=0.25, min_clip=1.5, max_clip=5.0)),
+    ("Chicos (3 a 6 s)", dict(min_sil=0.30, min_clip=1.5, max_clip=7.0)),
+    ("Medianos (5 a 10 s)", dict(min_sil=0.35, min_clip=2.0, max_clip=10.0)),
+    ("Largos (hasta 15 s)", dict(min_sil=0.40, min_clip=2.0, max_clip=15.0)),
+]
+
 
 def _app_is_foreground() -> bool:
     """True solo si la ventana en primer plano es de ESTE proceso. Sin esto, el
@@ -104,6 +113,16 @@ class DatasetFrame(wx.Frame):
         r_modo.Add(self.modo, 0, wx.ALL, 4)
         s.Add(r_modo, 0, wx.ALL, 2)
 
+        # Tamaño de los clips (etiqueta ANTES del control, por NVDA).
+        r_clip = wx.BoxSizer(wx.HORIZONTAL)
+        clip_lbl = wx.StaticText(p, label="Tamaño de los clips (audios largos):")
+        self.clip_choice = wx.Choice(p, choices=[c[0] for c in CLIP_PRESETS],
+                                     name="Tamaño de los clips")
+        self.clip_choice.SetSelection(0)
+        r_clip.Add(clip_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)
+        r_clip.Add(self.clip_choice, 0, wx.ALL, 4)
+        s.Add(r_clip, 0, wx.ALL, 2)
+
         r2 = wx.BoxSizer(wx.HORIZONTAL)
         self.name_ctrl = wx.TextCtrl(p, value="mivoz", name="Nombre del dataset")
         self.model_choice = wx.Choice(p, choices=["large-v3", "medium", "small"], name="Modelo whisper")
@@ -125,6 +144,7 @@ class DatasetFrame(wx.Frame):
         p.SetSizer(s)
 
         for c, l in [(self.inp_list, "Audios"), (self.modo, "Modo"),
+                     (self.clip_choice, "Tamaño de los clips"),
                      (self.name_ctrl, "Nombre del dataset"),
                      (self.model_choice, "Modelo whisper")]:
             c.Bind(wx.EVT_SET_FOCUS, lambda e, c=c, l=l: self._focus(e, c, l))
@@ -189,12 +209,13 @@ class DatasetFrame(wx.Frame):
         out = str(DATASETS_DIR / name)
         model = self.model_choice.GetStringSelection()
         multi = self.modo.GetSelection() == 1
+        clip = CLIP_PRESETS[max(0, self.clip_choice.GetSelection())][1]
         self._busy = True; self._stop.clear()
         self.build_btn.Enable(False); self.stop_btn.Enable(True)
         self.set_status("Armando dataset… (whisper puede tardar)")
-        threading.Thread(target=self._worker, args=(list(self.inputs), out, model, multi), daemon=True).start()
+        threading.Thread(target=self._worker, args=(list(self.inputs), out, model, multi, clip), daemon=True).start()
 
-    def _worker(self, inputs, out, model, multi):
+    def _worker(self, inputs, out, model, multi, clip):
         try:
             if multi:
                 # Cada entrada = un hablante (carpeta -> su nombre; archivo -> su stem).
@@ -204,10 +225,10 @@ class DatasetFrame(wx.Frame):
                     key = pth.name if pth.is_dir() else pth.stem
                     speakers.setdefault(key, []).append(inp)
                 n = build_multispeaker_dataset(speakers, out, model_size=model,
-                                               progress=self.set_status_ts, stop_flag=self._stop)
+                                               progress=self.set_status_ts, stop_flag=self._stop, **clip)
                 wx.CallAfter(self._done_multi, out, n)
             else:
-                build_dataset(inputs, out, model_size=model, progress=self.set_status_ts, stop_flag=self._stop)
+                build_dataset(inputs, out, model_size=model, progress=self.set_status_ts, stop_flag=self._stop, **clip)
                 wx.CallAfter(self._done, out)
         except Exception as ex:
             traceback.print_exc()

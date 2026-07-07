@@ -155,7 +155,7 @@ def _iter_inputs(inputs):
 
 
 def build_dataset(inputs, out_dir, model_size="large-v3", language="es",
-                  noise_db=-30, min_sil=0.4, min_clip=2.0, max_clip=15.0,
+                  noise_db=-30, min_sil=0.25, min_clip=1.5, max_clip=5.0,
                   progress=None, stop_flag=None):
     """Arma el dataset LJSpeech. `inputs`: lista de archivos y/o carpetas."""
     def say(m):
@@ -221,7 +221,8 @@ def fila_multi(wav_id: str, speaker: str, text: str) -> str:
 
 
 def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
-                               progress=None, stop_flag=None):
+                               progress=None, stop_flag=None,
+                               min_sil=0.25, min_clip=1.5, max_clip=5.0):
     """speakers: {nombre_hablante: [audios/carpetas]}. Arma wavs/ + metadata.csv
     (id|speaker|text). La fonemización la fija el entrenamiento, no el armado.
     Devuelve la cantidad de hablantes que quedaron con clips."""
@@ -241,7 +242,8 @@ def build_multispeaker_dataset(speakers, out_dir, model_size="large-v3",
         say(f"Procesando hablante: {speaker}")
         tmp = out / f"_tmp_{speaker}"          # carpeta temporal por hablante
         build_dataset(entradas, str(tmp), model_size=model_size,
-                      progress=progress, stop_flag=stop_flag)
+                      progress=progress, stop_flag=stop_flag,
+                      min_sil=min_sil, min_clip=min_clip, max_clip=max_clip)
         meta = tmp / "metadata.csv"
         if meta.exists():
             with open(meta, "r", encoding="utf-8") as f:

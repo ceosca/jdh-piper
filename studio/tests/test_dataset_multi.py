@@ -27,6 +27,14 @@ class TestPlanClips(unittest.TestCase):
         self.assertGreater(len(segs), 1)
         self.assertNotEqual(segs, [(0.0, 40.0)])  # no devuelve el archivo entero
 
+    def test_tope_chico_hace_mas_clips_y_mas_cortos(self):
+        # la palanca "muy chiquitos": bajar max_clip parte las tiradas largas en
+        # más clips y más cortos, aunque no haya silencios internos.
+        chicos = plan_clips(20.0, [], min_clip=1.5, max_clip=5.0)
+        grandes = plan_clips(20.0, [], min_clip=1.5, max_clip=15.0)
+        self.assertGreater(len(chicos), len(grandes))
+        self.assertTrue(all((b - a) <= 5.2 for a, b in chicos))  # todos ~<= 5 s
+
 
 if __name__ == "__main__":
     unittest.main()
